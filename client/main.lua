@@ -41,14 +41,37 @@ AddEventHandler('ari_garage:closemenu', function()
     menuIsShowed = false
     vehiclesList, vehiclesImpoundedList = {}, {}
 
+    -- Always release mouse/focus unconditionally
     SetNuiFocus(false, false)
+    SetNuiFocusKeepInput(false)
+
     SendNUIMessage({ action = 'hide' })
 
-    if not menuIsShowed and thisGarage then
-        ESX.TextUI(TranslateCap('access_parking'))
-    end
-    if not menuIsShowed and thisPound then
-        ESX.TextUI(TranslateCap('access_Impound'))
+    -- Small delay so TextUI doesn't fight the focus release
+    Citizen.SetTimeout(50, function()
+        if not menuIsShowed and thisGarage then
+            ESX.TextUI(TranslateCap('access_parking'))
+        end
+        if not menuIsShowed and thisPound then
+            ESX.TextUI(TranslateCap('access_Impound'))
+        end
+    end)
+end)
+
+-- Catch the game's native ESC/pause key to also close the menu
+-- (fires when player presses ESC in-game while NUI has focus)
+CreateThread(function()
+    while true do
+        Wait(0)
+        if menuIsShowed then
+            -- INPUT_FRONTEND_CANCEL = 200 (ESC / Back)
+            if IsDisabledControlJustReleased(0, 200) or IsDisabledControlJustReleased(0, 177) then
+                TriggerEvent('ari_garage:closemenu')
+            end
+            -- Block the pause/escape menu from opening while our NUI is active
+            DisableControlAction(0, 199, true) -- INPUT_FRONTEND_PAUSE
+            DisableControlAction(0, 200, true) -- INPUT_FRONTEND_CANCEL
+        end
     end
 end)
 

@@ -61,9 +61,7 @@ body {
 #overlay {
   position: fixed; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: transparent;
   opacity: 1;
   transition: opacity 200ms var(--ease-in);
   z-index: 999;
@@ -106,7 +104,7 @@ body {
   width: min(960px, calc(100vw - 48px));
   height: min(640px, calc(100vh - 48px));
   display: flex;
-  background: var(--bg-panel);
+  background: #13131A;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-panel);
@@ -138,7 +136,7 @@ body {
 #sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  background: var(--bg-sidebar);
+  background: #0E0E12;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -320,7 +318,7 @@ body {
 #search-input {
   width: 100%;
   padding: 8px 12px 8px 32px;
-  background: var(--bg-input);
+  background: #1C1C24;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
@@ -341,7 +339,7 @@ body {
   width: 34px; height: 34px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: var(--bg-input);
+  background: #1C1C24;
   color: var(--text-secondary);
   display: grid; place-items: center;
   cursor: pointer;
@@ -377,7 +375,7 @@ body {
 /* ─── Vehicle Card ─────────────────────────────────────────────────────────── */
 
 .vcard {
-  background: var(--bg-card);
+  background: #1C1C24;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 18px;
@@ -399,12 +397,12 @@ body {
   position: absolute;
   inset: 0;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(255,255,255,.035) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255,255,255,.025) 0%, transparent 60%);
   pointer-events: none;
 }
 
 .vcard:hover {
-  background: var(--bg-card-hover);
+  background: #21212C;
   border-color: var(--border-accent);
   box-shadow: 0 0 0 1px var(--accent-glow), var(--shadow-card);
   transform: translateY(-2px);
