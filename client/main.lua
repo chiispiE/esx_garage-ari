@@ -3,14 +3,12 @@
     Version: 1.14.0-ari
 --]]
 
-local LastMarker, LastPart         = nil, nil
-local thisGarage, thisPound        = nil, nil
-local nearMarker, menuIsShowed     = false, false
-local HasAlreadyEnteredMarker      = false
-local vehiclesList, vehiclesImpoundedList = {}, {}
+local LastMarker, LastPart = nil, nil
+local thisGarage, thisPound = nil, nil
+local nearMarker, menuIsShowed = false, false
+local HasAlreadyEnteredMarker = false
+local currentVehicles, currentImpoundedVehicles = {}, {}
 local next = next
-
--- ─── Helper ────────────────────────────────────────────────────────────────────
 
 local function PlayUISound()
     if Config.UI.Sound.Enabled then
@@ -19,193 +17,326 @@ local function PlayUISound()
 end
 
 local function IsJobAllowed(allowedJobs, allowedGrades)
-    if not allowedJobs then return true end
-    local playerJob   = ESX.PlayerData.job
-    local playerGrade = ESX.PlayerData.job.grade
+    if not allowedJobs then
+        return true
+    end
 
-    for _, job in ipairs(allowedJobs) do
-        if playerJob.name == job then
-            if allowedGrades and allowedGrades[job] then
-                return playerGrade >= allowedGrades[job]
+    local playerJob = ESX.PlayerData.job
+    if not playerJob then
+        return false
+    end
+
+    local playerGrade = tonumber(playerJob.grade) or 0
+    for i = 1, #allowedJobs do
+        local jobName = allowedJobs[i]
+        if playerJob.name == jobName then
+            if allowedGrades and allowedGrades[jobName] then
+                return playerGrade >= allowedGrades[jobName]
             end
+
             return true
         end
     end
+
     return false
 end
 
--- ─── Close Menu ────────────────────────────────────────────────────────────────
+local function ResetMenuState()
+    currentVehicles = {}
+    currentImpoundedVehicles = {}
+end
+
+local function BuildVehicleType(model)
+    if not model then
+        return 'car'
+    end
+
+    local class = GetVehicleClassFromName(model)
+
+    if class == 8 or class == 13 then
+        return 'bike'
+    elseif class == 14 then
+        return 'boat'
+    elseif class == 15 or class == 16 then
+        return 'air'
+    end
+
+    return 'car'
+end
+
+local function VehicleMatchesFilter(vehicleProps, filterName)
+    if not filterName or filterName == 'all' then
+        return true
+    end
+
+    return BuildVehicleType(vehicleProps.model) == filterName
+end
+
+local function MapVehicleForUI(entry, overrideState)
+    local props = entry.vehicle or entry.props or {}
+    local displayName = props.model and GetDisplayNameFromVehicleModel(props.model) or 'CARNOTFOUND'
+    local stateName = overrideState or (entry.stored == 2 and 'impounded' or (entry.stored == 1 and 'stored' or 'out'))
+
+    return {
+        model = displayName ~= 'CARNOTFOUND' and displayName or (props.modelName or 'Unknown'),
+        plate = entry.plate,
+        props = props,
+        state = stateName,
+        pound = entry.pound,
+        parking = entry.parking,
+        releaseCost = entry.releaseCost or 0,
+        releaseFree = entry.releaseFree == true,
+    }
+end
+
+local function BuildLocales()
+    return {
+        action = TranslateCap('veh_exit'),
+        veh_model = TranslateCap('veh_model'),
+        veh_plate = TranslateCap('veh_plate'),
+        veh_condition = TranslateCap('veh_condition'),
+        veh_action = TranslateCap('veh_action'),
+        impound_action = TranslateCap('impound_action'),
+        locate_impound = TranslateCap('locate_impound'),
+        no_veh_parking = TranslateCap('no_veh_parking'),
+        no_veh_impounded = TranslateCap('no_veh_impounded'),
+        pay_impound = TranslateCap('pay_impound'),
+        fuel = TranslateCap('fuel') or 'Fuel',
+        state_label = TranslateCap('veh_state'),
+        state_garage = TranslateCap('state_garage'),
+        state_impound = TranslateCap('state_impound'),
+        state_out = TranslateCap('state_out'),
+        release_cost = TranslateCap('release_cost'),
+        free_release = TranslateCap('free_release'),
+        no_results = TranslateCap('no_results'),
+    }
+end
+
+local function BuildGaragePayload(garageKey, garage, vehicles, impoundedVehicles)
+    local impound = garage.ImpoundedName and Config.Impounds[garage.ImpoundedName] or nil
+    local spawnPoint = {
+        x = garage.SpawnPoint.x,
+        y = garage.SpawnPoint.y,
+        z = garage.SpawnPoint.z,
+        heading = garage.SpawnPoint.heading,
+    }
+
+    local poundSpawnPoint = nil
+    if impound then
+        poundSpawnPoint = { x = impound.GetOutPoint.x, y = impound.GetOutPoint.y }
+    end
+
+    return {
+        action = 'show',
+        menuType = 'garage',
+        garageLabel = garage.Label or garageKey,
+        vehiclesList = json.encode(vehicles),
+        vehiclesImpoundedList = next(impoundedVehicles) and json.encode(impoundedVehicles) or nil,
+        poundName = garage.ImpoundedName,
+        poundSpawnPoint = poundSpawnPoint,
+        spawnPoint = spawnPoint,
+        accentColor = Config.UI.AccentColor,
+        animateCards = Config.UI.AnimateCards,
+        showFuel = Config.UI.ShowFuelGauge,
+        locales = BuildLocales(),
+    }
+end
+
+local function BuildImpoundPayload(poundKey, pound, vehicles, meta)
+    return {
+        action = 'show',
+        menuType = 'impound',
+        garageLabel = pound.Label or poundKey,
+        vehiclesList = json.encode(vehicles),
+        spawnPoint = {
+            x = pound.SpawnPoint.x,
+            y = pound.SpawnPoint.y,
+            z = pound.SpawnPoint.z,
+            heading = pound.SpawnPoint.heading,
+        },
+        poundName = poundKey,
+        poundCost = meta.cost or pound.Cost,
+        freeRelease = meta.freeRelease == true,
+        accentColor = Config.UI.AccentColor,
+        animateCards = Config.UI.AnimateCards,
+        showFuel = Config.UI.ShowFuelGauge,
+        locales = BuildLocales(),
+    }
+end
 
 RegisterNetEvent('ari_garage:closemenu')
 AddEventHandler('ari_garage:closemenu', function()
     menuIsShowed = false
-    vehiclesList, vehiclesImpoundedList = {}, {}
+    ResetMenuState()
 
-    -- Always release mouse/focus unconditionally
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
 
     SendNUIMessage({ action = 'hide' })
 
-    -- Small delay so TextUI doesn't fight the focus release
     Citizen.SetTimeout(50, function()
         if not menuIsShowed and thisGarage then
             ESX.TextUI(TranslateCap('access_parking'))
         end
+
         if not menuIsShowed and thisPound then
             ESX.TextUI(TranslateCap('access_Impound'))
         end
     end)
 end)
 
--- Catch the game's native ESC/pause key to also close the menu
--- (fires when player presses ESC in-game while NUI has focus)
 CreateThread(function()
     while true do
         Wait(0)
         if menuIsShowed then
-            -- INPUT_FRONTEND_CANCEL = 200 (ESC / Back)
             if IsDisabledControlJustReleased(0, 200) or IsDisabledControlJustReleased(0, 177) then
                 TriggerEvent('ari_garage:closemenu')
             end
-            -- Block the pause/escape menu from opening while our NUI is active
-            DisableControlAction(0, 199, true) -- INPUT_FRONTEND_PAUSE
-            DisableControlAction(0, 200, true) -- INPUT_FRONTEND_CANCEL
+
+            DisableControlAction(0, 199, true)
+            DisableControlAction(0, 200, true)
         end
     end
 end)
 
-RegisterNUICallback('escape', function(data, cb)
+RegisterNUICallback('escape', function(_, cb)
     TriggerEvent('ari_garage:closemenu')
     cb('ok')
 end)
-
--- ─── Spawn Vehicle ─────────────────────────────────────────────────────────────
 
 RegisterNUICallback('spawnVehicle', function(data, cb)
     local spawnCoords = vector3(data.spawnPoint.x, data.spawnPoint.y, data.spawnPoint.z)
-
-    -- Always close the menu and release focus first, then handle logic
     TriggerEvent('ari_garage:closemenu')
+
+    if not ESX.Game.IsSpawnPointClear(spawnCoords, 2.5) then
+        ESX.ShowNotification(TranslateCap('veh_block'), 'error')
+        return cb('ok')
+    end
 
     if thisGarage then
-        if ESX.Game.IsSpawnPointClear(spawnCoords, 2.5) then
-            thisGarage = nil
-            TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
-            ESX.ShowNotification(TranslateCap('veh_released'))
-        else
-            ESX.ShowNotification(TranslateCap('veh_block'), 'error')
-        end
+        thisGarage = nil
+        TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
+        ESX.ShowNotification(TranslateCap('veh_released'))
+        return cb('ok')
+    end
 
-    elseif thisPound then
-        ESX.TriggerServerCallback('ari_garage:checkMoney', function(hasMoney)
-            if hasMoney then
-                if ESX.Game.IsSpawnPointClear(spawnCoords, 2.5) then
-                    TriggerServerEvent('ari_garage:payPound', data.exitVehicleCost)
-                    thisPound = nil
-                    TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
-                else
-                    ESX.ShowNotification(TranslateCap('veh_block'), 'error')
-                end
-            else
-                ESX.ShowNotification(TranslateCap('missing_money'))
+    if thisPound then
+        ESX.TriggerServerCallback('ari_garage:checkMoney', function(result)
+            if not result or result.allowed == false then
+                ESX.ShowNotification(TranslateCap('not_allowed'), 'error')
+                return
             end
-        end, data.exitVehicleCost)
+
+            if result.hasMoney == false then
+                ESX.ShowNotification(TranslateCap('missing_money'))
+                return
+            end
+
+            TriggerServerEvent('ari_garage:payPound', result.amount, data.poundName, data.vehicleProps)
+            thisPound = nil
+            TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
+        end, data.exitVehicleCost, data.poundName, data.vehicleProps)
     end
 
     cb('ok')
 end)
-
--- ─── Impound ───────────────────────────────────────────────────────────────────
 
 RegisterNUICallback('impound', function(data, cb)
-    TriggerServerEvent('ari_garage:setImpound', data.poundName, data.vehicleProps)
     TriggerEvent('ari_garage:closemenu')
-    SetNewWaypoint(data.poundSpawnPoint.x, data.poundSpawnPoint.y)
+
+    if data.mode == 'track' then
+        if data.poundSpawnPoint then
+            SetNewWaypoint(data.poundSpawnPoint.x, data.poundSpawnPoint.y)
+        end
+
+        cb('ok')
+        return
+    end
+
+    TriggerServerEvent('ari_garage:setImpound', data.poundName, data.vehicleProps)
+    if data.poundSpawnPoint then
+        SetNewWaypoint(data.poundSpawnPoint.x, data.poundSpawnPoint.y)
+    end
     cb('ok')
 end)
 
--- ─── Blips ─────────────────────────────────────────────────────────────────────
-
 CreateThread(function()
-    for k, v in pairs(Config.Garages) do
-        local b = Config.GarageBlip
-        local blip = AddBlipForCoord(v.EntryPoint.x, v.EntryPoint.y, v.EntryPoint.z)
-        SetBlipSprite(blip, v.Sprite  or b.Sprite)
-        SetBlipDisplay(blip, b.Display)
-        SetBlipScale(blip, v.Scale  or b.Scale)
-        SetBlipColour(blip, v.Colour or b.Colour)
-        SetBlipAsShortRange(blip, b.ShortRange)
-        BeginTextCommandSetBlipName("STRING")
-        AddTextComponentSubstringPlayerName(v.Label or TranslateCap('parking_blip_name'))
+    for _, garage in pairs(Config.Garages) do
+        local defaultBlip = Config.GarageBlip
+        local blip = AddBlipForCoord(garage.EntryPoint.x, garage.EntryPoint.y, garage.EntryPoint.z)
+        SetBlipSprite(blip, garage.Sprite or defaultBlip.Sprite)
+        SetBlipDisplay(blip, defaultBlip.Display)
+        SetBlipScale(blip, garage.Scale or defaultBlip.Scale)
+        SetBlipColour(blip, garage.Colour or defaultBlip.Colour)
+        SetBlipAsShortRange(blip, defaultBlip.ShortRange)
+        BeginTextCommandSetBlipName('STRING')
+        AddTextComponentSubstringPlayerName(garage.Label or TranslateCap('parking_blip_name'))
         EndTextCommandSetBlipName(blip)
     end
 
-    for k, v in pairs(Config.Impounds) do
-        local b = Config.ImpoundBlip
-        local blip = AddBlipForCoord(v.GetOutPoint.x, v.GetOutPoint.y, v.GetOutPoint.z)
-        SetBlipSprite(blip, v.Sprite  or b.Sprite)
-        SetBlipDisplay(blip, b.Display)
-        SetBlipScale(blip, v.Scale  or b.Scale)
-        SetBlipColour(blip, v.Colour or b.Colour)
-        SetBlipAsShortRange(blip, b.ShortRange)
-        BeginTextCommandSetBlipName("STRING")
-        AddTextComponentSubstringPlayerName(v.Label or TranslateCap('Impound_blip_name'))
+    for _, impound in pairs(Config.Impounds) do
+        local defaultBlip = Config.ImpoundBlip
+        local blip = AddBlipForCoord(impound.GetOutPoint.x, impound.GetOutPoint.y, impound.GetOutPoint.z)
+        SetBlipSprite(blip, impound.Sprite or defaultBlip.Sprite)
+        SetBlipDisplay(blip, defaultBlip.Display)
+        SetBlipScale(blip, impound.Scale or defaultBlip.Scale)
+        SetBlipColour(blip, impound.Colour or defaultBlip.Colour)
+        SetBlipAsShortRange(blip, defaultBlip.ShortRange)
+        BeginTextCommandSetBlipName('STRING')
+        AddTextComponentSubstringPlayerName(impound.Label or TranslateCap('Impound_blip_name'))
         EndTextCommandSetBlipName(blip)
     end
 end)
-
--- ─── Marker Enter / Exit events ────────────────────────────────────────────────
 
 AddEventHandler('ari_garage:hasEnteredMarker', function(name, part)
     if part == 'EntryPoint' then
         local isInVehicle = IsPedInAnyVehicle(ESX.PlayerData.ped, false)
         thisGarage = Config.Garages[name]
+        thisPound = nil
         ESX.TextUI(isInVehicle and TranslateCap('park_veh') or TranslateCap('access_parking'))
     elseif part == 'GetOutPoint' then
         thisPound = Config.Impounds[name]
+        thisGarage = nil
         ESX.TextUI(TranslateCap('access_Impound'))
     end
 end)
 
 AddEventHandler('ari_garage:hasExitedMarker', function()
     thisGarage = nil
-    thisPound  = nil
+    thisPound = nil
     ESX.HideUI()
     TriggerEvent('ari_garage:closemenu')
 end)
 
--- ─── Draw Markers ──────────────────────────────────────────────────────────────
-
 CreateThread(function()
     while true do
-        local sleep      = 500
-        local playerPed  = ESX.PlayerData.ped
-        local coords     = GetEntityCoords(playerPed)
+        local sleep = 500
+        local playerPed = ESX.PlayerData.ped
+        local coords = GetEntityCoords(playerPed)
 
-        for _, v in pairs(Config.Garages) do
-            local ep = v.EntryPoint
-            if #(coords - vector3(ep.x, ep.y, ep.z)) < Config.DrawDistance then
-                local m = Config.Markers.EntryPoint
-                DrawMarker(m.Type, ep.x, ep.y, ep.z,
+        for _, garage in pairs(Config.Garages) do
+            local entryPoint = garage.EntryPoint
+            if #(coords - vector3(entryPoint.x, entryPoint.y, entryPoint.z)) < Config.DrawDistance then
+                local marker = Config.Markers.EntryPoint
+                DrawMarker(marker.Type, entryPoint.x, entryPoint.y, entryPoint.z,
                     0.0, 0.0, 0.0, 0, 0.0, 0.0,
-                    m.Size.x, m.Size.y, m.Size.z,
-                    m.Color.r, m.Color.g, m.Color.b,
-                    m.Alpha, false, true, 2, m.Bob, false, false, false)
+                    marker.Size.x, marker.Size.y, marker.Size.z,
+                    marker.Color.r, marker.Color.g, marker.Color.b,
+                    marker.Alpha, false, true, 2, marker.Bob, false, false, false)
                 sleep = 0
                 break
             end
         end
 
-        for _, v in pairs(Config.Impounds) do
-            local gp = v.GetOutPoint
-            if #(coords - vector3(gp.x, gp.y, gp.z)) < Config.DrawDistance then
-                local m = Config.Markers.GetOutPoint
-                DrawMarker(m.Type, gp.x, gp.y, gp.z,
+        for _, impound in pairs(Config.Impounds) do
+            local getOutPoint = impound.GetOutPoint
+            if #(coords - vector3(getOutPoint.x, getOutPoint.y, getOutPoint.z)) < Config.DrawDistance then
+                local marker = Config.Markers.GetOutPoint
+                DrawMarker(marker.Type, getOutPoint.x, getOutPoint.y, getOutPoint.z,
                     0.0, 0.0, 0.0, 0, 0.0, 0.0,
-                    m.Size.x, m.Size.y, m.Size.z,
-                    m.Color.r, m.Color.g, m.Color.b,
-                    m.Alpha, false, true, 2, m.Bob, false, false, false)
+                    marker.Size.x, marker.Size.y, marker.Size.z,
+                    marker.Color.r, marker.Color.g, marker.Color.b,
+                    marker.Alpha, false, true, 2, marker.Bob, false, false, false)
                 sleep = 0
                 break
             end
@@ -216,188 +347,128 @@ CreateThread(function()
     end
 end)
 
--- ─── Open Garage Menu ──────────────────────────────────────────────────────────
-
-local function buildLocales()
-    return {
-        action         = TranslateCap('veh_exit'),
-        veh_model      = TranslateCap('veh_model'),
-        veh_plate      = TranslateCap('veh_plate'),
-        veh_condition  = TranslateCap('veh_condition'),
-        veh_action     = TranslateCap('veh_action'),
-        impound_action = TranslateCap('impound_action'),
-        no_veh_parking = TranslateCap('no_veh_parking'),
-        no_veh_impounded = TranslateCap('no_veh_impounded'),
-        pay_impound    = TranslateCap('pay_impound'),
-        fuel           = TranslateCap('fuel') or 'Fuel',
-    }
-end
-
-local function openGarageMenu(garageKey, garage)
+local function OpenGarageMenu(garageKey, garage)
     ESX.TriggerServerCallback('ari_garage:getVehiclesInParking', function(vehicles)
-        menuIsShowed = true
+        ESX.TriggerServerCallback('ari_garage:getVehiclesImpounded', function(impoundedVehicles)
+            ResetMenuState()
 
-        for i = 1, #vehicles do
-            table.insert(vehiclesList, {
-                model = GetDisplayNameFromVehicleModel(vehicles[i].vehicle.model),
-                plate = vehicles[i].plate,
-                props = vehicles[i].vehicle,
-            })
-        end
-
-        local spawnPoint = {
-            x = garage.SpawnPoint.x,
-            y = garage.SpawnPoint.y,
-            z = garage.SpawnPoint.z,
-            heading = garage.SpawnPoint.heading,
-        }
-
-        ESX.TriggerServerCallback('ari_garage:getVehiclesImpounded', function(impVehicles)
-            for i = 1, #impVehicles do
-                table.insert(vehiclesImpoundedList, {
-                    model = GetDisplayNameFromVehicleModel(impVehicles[i].vehicle.model),
-                    plate = impVehicles[i].plate,
-                    props = impVehicles[i].vehicle,
-                })
+            for i = 1, #vehicles do
+                if VehicleMatchesFilter(vehicles[i].vehicle, garage.VehicleFilter) then
+                    currentVehicles[#currentVehicles + 1] = MapVehicleForUI(vehicles[i], 'stored')
+                end
             end
 
-            local poundSpawnPoint = nil
-            if garage.ImpoundedName and Config.Impounds[garage.ImpoundedName] then
-                local imp = Config.Impounds[garage.ImpoundedName]
-                poundSpawnPoint = { x = imp.GetOutPoint.x, y = imp.GetOutPoint.y }
+            for i = 1, #impoundedVehicles do
+                if VehicleMatchesFilter(impoundedVehicles[i].vehicle, garage.VehicleFilter) then
+                    currentImpoundedVehicles[#currentImpoundedVehicles + 1] = MapVehicleForUI(impoundedVehicles[i], 'impounded')
+                end
             end
 
+            menuIsShowed = true
             PlayUISound()
 
-            SendNUIMessage({
-                action               = 'show',
-                menuType             = 'garage',
-                garageLabel          = garage.Label or garageKey,
-                vehiclesList         = json.encode(vehiclesList),
-                vehiclesImpoundedList = next(vehiclesImpoundedList) and json.encode(vehiclesImpoundedList) or nil,
-                poundName            = garage.ImpoundedName,
-                poundSpawnPoint      = poundSpawnPoint,
-                spawnPoint           = spawnPoint,
-                accentColor          = Config.UI.AccentColor,
-                animateCards         = Config.UI.AnimateCards,
-                showFuel             = Config.UI.ShowFuelGauge,
-                locales              = buildLocales(),
-            })
-
+            SendNUIMessage(BuildGaragePayload(garageKey, garage, currentVehicles, currentImpoundedVehicles))
             SetNuiFocus(true, true)
             ESX.HideUI()
         end)
-
     end, garageKey)
 end
 
-local function openImpoundMenu(poundKey, pound)
-    ESX.TriggerServerCallback('ari_garage:getVehiclesInPound', function(vehicles)
-        if next(vehicles) then
-            menuIsShowed = true
-
-            for i = 1, #vehicles do
-                table.insert(vehiclesList, {
-                    model = GetDisplayNameFromVehicleModel(vehicles[i].vehicle.model),
-                    plate = vehicles[i].plate,
-                    props = vehicles[i].vehicle,
-                })
-            end
-
-            PlayUISound()
-
-            SendNUIMessage({
-                action       = 'show',
-                menuType     = 'impound',
-                garageLabel  = pound.Label or poundKey,
-                vehiclesList = json.encode(vehiclesList),
-                spawnPoint   = { x = pound.SpawnPoint.x, y = pound.SpawnPoint.y, z = pound.SpawnPoint.z, heading = pound.SpawnPoint.heading },
-                poundCost    = pound.Cost,
-                accentColor  = Config.UI.AccentColor,
-                animateCards = Config.UI.AnimateCards,
-                showFuel     = Config.UI.ShowFuelGauge,
-                locales      = buildLocales(),
-            })
-
-            SetNuiFocus(true, true)
-            ESX.HideUI()
-        else
-            ESX.ShowNotification(TranslateCap('no_veh_Impound'))
+local function OpenImpoundMenu(poundKey, pound)
+    ESX.TriggerServerCallback('ari_garage:getVehiclesInPound', function(response)
+        if not response or response.allowed == false then
+            ESX.ShowNotification(TranslateCap('not_allowed'), 'error')
+            return
         end
+
+        local vehicles = response.vehicles or {}
+        if not next(vehicles) then
+            ESX.ShowNotification(TranslateCap('no_veh_Impound'))
+            return
+        end
+
+        ResetMenuState()
+
+        for i = 1, #vehicles do
+            currentVehicles[#currentVehicles + 1] = MapVehicleForUI(vehicles[i], 'impounded')
+        end
+
+        menuIsShowed = true
+        PlayUISound()
+
+        SendNUIMessage(BuildImpoundPayload(poundKey, pound, currentVehicles, response))
+        SetNuiFocus(true, true)
+        ESX.HideUI()
     end, poundKey)
 end
-
--- ─── Interaction Loop ──────────────────────────────────────────────────────────
 
 CreateThread(function()
     while true do
         if nearMarker then
-            local playerPed     = ESX.PlayerData.ped
-            local coords        = GetEntityCoords(playerPed)
-            local isInMarker    = false
+            local playerPed = ESX.PlayerData.ped
+            local coords = GetEntityCoords(playerPed)
+            local isInMarker = false
             local currentMarker = nil
-            local currentPart   = nil
+            local currentPart = nil
 
-            -- Garage entry points
-            for k, v in pairs(Config.Garages) do
-                local ep = v.EntryPoint
-                if #(coords - vector3(ep.x, ep.y, ep.z)) < Config.Markers.EntryPoint.Size.x then
-                    isInMarker    = true
-                    currentMarker = k
-                    currentPart   = 'EntryPoint'
+            for garageKey, garage in pairs(Config.Garages) do
+                local entryPoint = garage.EntryPoint
+                if #(coords - vector3(entryPoint.x, entryPoint.y, entryPoint.z)) < Config.Markers.EntryPoint.Size.x then
+                    isInMarker = true
+                    currentMarker = garageKey
+                    currentPart = 'EntryPoint'
 
                     local isInVehicle = IsPedInAnyVehicle(playerPed, false)
-
                     if not isInVehicle then
                         if IsControlJustReleased(0, 38) and not menuIsShowed then
-                            if not IsJobAllowed(v.AllowedJobs, v.AllowedGrades) then
+                            if not IsJobAllowed(garage.AllowedJobs, garage.AllowedGrades) then
                                 ESX.ShowNotification(TranslateCap('not_allowed'), 'error')
                             else
-                                openGarageMenu(k, v)
+                                OpenGarageMenu(garageKey, garage)
                             end
                         end
-                    else
-                        if IsControlJustReleased(0, 38) then
-                            local vehicle     = GetVehiclePedIsIn(playerPed, false)
-                            local vehicleProps = ESX.Game.GetVehicleProperties(vehicle)
-                            ESX.TriggerServerCallback('ari_garage:checkVehicleOwner', function(owner)
-                                if owner then
-                                    ESX.Game.DeleteVehicle(vehicle)
-                                    TriggerServerEvent('ari_garage:updateOwnedVehicle', true, k, nil, { vehicleProps = vehicleProps })
-                                    ESX.ShowNotification(TranslateCap('veh_stored'))
-                                else
-                                    ESX.ShowNotification(TranslateCap('not_owning_veh'), 'error')
-                                end
-                            end, vehicleProps.plate)
-                        end
+                    elseif IsControlJustReleased(0, 38) then
+                        local vehicle = GetVehiclePedIsIn(playerPed, false)
+                        local vehicleProps = ESX.Game.GetVehicleProperties(vehicle)
+
+                        ESX.TriggerServerCallback('ari_garage:checkVehicleOwner', function(owner)
+                            if not owner then
+                                ESX.ShowNotification(TranslateCap('not_owning_veh'), 'error')
+                                return
+                            end
+
+                            ESX.Game.DeleteVehicle(vehicle)
+                            TriggerServerEvent('ari_garage:updateOwnedVehicle', true, garageKey, nil, { vehicleProps = vehicleProps })
+                        end, vehicleProps.plate)
                     end
+
                     break
                 end
             end
 
-            -- Impound get-out points
-            for k, v in pairs(Config.Impounds) do
-                local gp = v.GetOutPoint
-                if #(coords - vector3(gp.x, gp.y, gp.z)) < 2.0 then
-                    isInMarker    = true
-                    currentMarker = k
-                    currentPart   = 'GetOutPoint'
+            for impoundKey, impound in pairs(Config.Impounds) do
+                local getOutPoint = impound.GetOutPoint
+                if #(coords - vector3(getOutPoint.x, getOutPoint.y, getOutPoint.z)) < 2.0 then
+                    isInMarker = true
+                    currentMarker = impoundKey
+                    currentPart = 'GetOutPoint'
 
                     if IsControlJustReleased(0, 38) and not menuIsShowed then
-                        openImpoundMenu(k, v)
+                        OpenImpoundMenu(impoundKey, impound)
                     end
+
                     break
                 end
             end
 
-            -- Enter / exit events
             if isInMarker and (not HasAlreadyEnteredMarker or LastMarker ~= currentMarker or LastPart ~= currentPart) then
                 if LastMarker ~= currentMarker or LastPart ~= currentPart then
                     TriggerEvent('ari_garage:hasExitedMarker')
                 end
+
                 HasAlreadyEnteredMarker = true
                 LastMarker = currentMarker
-                LastPart   = currentPart
+                LastPart = currentPart
                 TriggerEvent('ari_garage:hasEnteredMarker', currentMarker, currentPart)
             end
 

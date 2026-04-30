@@ -1,16 +1,31 @@
 -- ari_garage SQL migration
--- Run this if upgrading from esx_garage_v2 (or a fresh install)
--- Safe to run multiple times (uses IF NOT EXISTS / checks)
+-- Vehicle state convention used by this resource:
+--   0 = out
+--   1 = stored in garage
+--   2 = impounded
 
 ALTER TABLE `owned_vehicles`
-  ADD COLUMN IF NOT EXISTS `parking` VARCHAR(60) NULL AFTER `stored`;
+  ADD COLUMN IF NOT EXISTS `parking` VARCHAR(60) NULL DEFAULT NULL AFTER `stored`,
+  ADD COLUMN IF NOT EXISTS `pound` VARCHAR(60) NULL DEFAULT NULL AFTER `parking`;
 
-ALTER TABLE `owned_vehicles`
-  ADD COLUMN IF NOT EXISTS `pound` VARCHAR(60) NULL AFTER `parking`;
+UPDATE `owned_vehicles`
+SET
+  `parking` = NULLIF(TRIM(`parking`), ''),
+  `pound` = NULLIF(TRIM(`pound`), '');
 
--- Index for faster queries (optional but recommended on large servers)
-CREATE INDEX IF NOT EXISTS `idx_ov_owner_parking`
-  ON `owned_vehicles` (`owner`, `parking`, `stored`);
+UPDATE `owned_vehicles`
+SET `pound` = NULL
+WHERE `stored` <> 2;
 
-CREATE INDEX IF NOT EXISTS `idx_ov_owner_pound`
-  ON `owned_vehicles` (`owner`, `pound`, `stored`);
+UPDATE `owned_vehicles`
+SET `parking` = NULL
+WHERE `stored` <> 1;
+
+CREATE INDEX IF NOT EXISTS `idx_owned_vehicles_owner_stored_parking`
+  ON `owned_vehicles` (`owner`, `stored`, `parking`);
+
+CREATE INDEX IF NOT EXISTS `idx_owned_vehicles_owner_stored_pound`
+  ON `owned_vehicles` (`owner`, `stored`, `pound`);
+
+CREATE INDEX IF NOT EXISTS `idx_owned_vehicles_owner_plate`
+  ON `owned_vehicles` (`owner`, `plate`);

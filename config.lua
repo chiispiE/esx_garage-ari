@@ -22,8 +22,8 @@ Config.InteractDistance = 1.5
 -- Show floating 3D text above markers when player is within DrawDistance
 Config.Show3DText = true
 
--- Use target system instead of markers? (set true if you have ox_target / qtarget)
--- When true, markers are hidden and interactions use the target box instead.
+-- Use target system instead of markers? (reserved for custom integrations)
+-- This version keeps the marker flow as the supported path.
 Config.UseTarget = false
 
 -- ─── IMPOUND ───────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ Config.ImpoundBlip = {
 
 Config.UI = {
     -- Theme accent colour (hex) — used by the NUI
-    AccentColor = '#F5A623',
+    AccentColor = '#A855F7',
 
     -- Show vehicle thumbnail images in the UI (requires model-named .webp in nui/img/vehicles/)
     ShowVehicleImages = false,
@@ -174,7 +174,8 @@ Config.Garages = {
         SpawnPoint   — {x, y, z, heading} where the vehicle appears on release
         Cost         — base fee in $
         Label        — display name shown in the UI
-        AllowedJobs  — if set, only these jobs can release vehicles without paying
+        AllowedJobs  — if set, only these jobs can use restricted/free release flows
+        AllowedGrades — minimum grade per job, e.g. {police=2}
         FreeRelease  — if AllowedJobs match the player, waive the fee
         Sprite / Scale / Colour — blip overrides (optional)
 --]]
@@ -186,6 +187,7 @@ Config.Impounds = {
         SpawnPoint  = { x = 401.9,  y = -1647.4, z = 29.2, heading = 323.3 },
         Cost       = 3000,
         AllowedJobs = nil,
+        AllowedGrades = nil,
         FreeRelease = false,
         Sprite  = 524,
         Scale   = 0.8,
@@ -197,6 +199,7 @@ Config.Impounds = {
         SpawnPoint  = { x = -204.6, y = 6221.6,  z = 30.5, heading = 227.2 },
         Cost       = 3000,
         AllowedJobs = nil,
+        AllowedGrades = nil,
         FreeRelease = false,
         Sprite  = 524,
         Scale   = 0.8,
@@ -208,6 +211,7 @@ Config.Impounds = {
         SpawnPoint  = { x = 1722.7, y = 3713.6,  z = 33.2, heading = 19.9 },
         Cost       = 3000,
         AllowedJobs = nil,
+        AllowedGrades = nil,
         FreeRelease = false,
         Sprite  = 524,
         Scale   = 0.8,
