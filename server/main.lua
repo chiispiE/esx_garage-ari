@@ -1,6 +1,6 @@
 --[[
     ari_garage — Server
-    Version: 1.15.0-ari
+    Version: 1.15.2-ari
 --]]
 
 local VEHICLE_STATE = {
@@ -11,7 +11,7 @@ local VEHICLE_STATE = {
 
 CreateThread(function()
     local resourceName = GetCurrentResourceName()
-    local version = GetResourceMetadata(resourceName, 'version', 0) or '1.15.0-ari'
+    local version = GetResourceMetadata(resourceName, 'version', 0) or '1.15.2-ari'
     local author = GetResourceMetadata(resourceName, 'author', 0) or 'Ari'
 
     Wait(500)
@@ -28,7 +28,7 @@ CreateThread(function()
 end)
 
 local function getPlayerFromSource(source)
-    local xPlayer = ESX.Player(source)
+    local xPlayer = ESX and ESX.Player and ESX.Player(source)
     if not xPlayer then
         return nil
     end
@@ -37,6 +37,7 @@ local function getPlayerFromSource(source)
 end
 
 local function getPlayerJobData(xPlayer)
+    if not xPlayer then return nil, -1 end
     local job = xPlayer.getJob and xPlayer.getJob() or xPlayer.job
     if not job then
         return nil, -1
@@ -74,17 +75,29 @@ local function isJobAllowedForImpound(xPlayer, impound)
     return false
 end
 
+-- ── Single source of truth for impound release pricing ────────────────────
+local function calculateReleaseCost(impound, props)
+    if not impound then return 0 end
+    local baseCost = impound.Cost or 0
+
+    if not props or (Config.ImpoundDamageMult or 1.0) <= 1.0 then
+        return baseCost
+    end
+
+    local engineHealth = math.min(props.engineHealth or 1000, 1000)
+    local damageRatio = math.max(0.0, 1.0 - (engineHealth / 1000))
+    local mult = 1.0 + (damageRatio * (Config.ImpoundDamageMult - 1.0))
+
+    return math.floor(baseCost * mult)
+end
+
 local function decodeVehicleRows(rows, impound)
     local vehicles = {}
 
     for i = 1, #rows do
         local props = rows[i].vehicle and json.decode(rows[i].vehicle) or nil
         if props then
-            local releaseCost = 0
-            if impound then
-                releaseCost = math.floor((impound.Cost or 0) * (1.0 + math.max(0.0, (1.0 - math.min(props.engineHealth or 1000, 1000) / 1000)) * math.max(Config.ImpoundDamageMult - 1.0, 0.0)))
-                releaseCost = math.max(releaseCost, impound.Cost or 0)
-            end
+            local releaseCost = impound and calculateReleaseCost(impound, props) or 0
 
             vehicles[#vehicles + 1] = {
                 vehicle = props,
@@ -101,43 +114,34 @@ local function decodeVehicleRows(rows, impound)
 end
 
 local function computeReleaseData(xPlayer, impound, props)
-    local baseCost = impound and impound.Cost or 0
-    local finalCost = baseCost
+    local allowed = isJobAllowedForImpound(xPlayer, impound)
 
-    if impound and Config.ImpoundDamageMult > 1.0 then
-        local engineHealth = math.min(props and props.engineHealth or 1000, 1000)
-        local damageRatio = 1.0 - (engineHealth / 1000)
-        finalCost = math.floor(baseCost * (1.0 + (damageRatio * (Config.ImpoundDamageMult - 1.0))))
+    if not allowed then
+        return { allowed = false, amount = 0, isFree = false, reason = 'not_allowed' }
     end
 
-    local canUseFreeRelease = impound and impound.FreeRelease and isJobAllowedForImpound(xPlayer, impound)
-    if canUseFreeRelease then
+    local finalCost = calculateReleaseCost(impound, props)
+
+    if impound and impound.FreeRelease then
         finalCost = 0
     end
 
-    local allowed = isJobAllowedForImpound(xPlayer, impound)
-    local reason = nil
-
-    if not allowed then
-        reason = 'not_allowed'
-    end
-
     return {
-        allowed = allowed,
+        allowed = true,
         amount = math.max(0, finalCost),
         isFree = finalCost <= 0,
-        reason = reason,
+        reason = nil,
     }
 end
 
 local function canAffordImpound(xPlayer, amount)
-    if amount <= 0 then
-        return true
-    end
+    if amount <= 0 or not xPlayer then return true end
 
-    if Config.PaymentMethod == 'bank' then
+    local method = Config.PaymentMethod or 'cash'
+
+    if method == 'bank' then
         return xPlayer.getAccount('bank').money >= amount
-    elseif Config.PaymentMethod == 'any' then
+    elseif method == 'any' then
         return (xPlayer.getMoney() + xPlayer.getAccount('bank').money) >= amount
     end
 
@@ -145,18 +149,18 @@ local function canAffordImpound(xPlayer, amount)
 end
 
 local function deductImpoundPayment(xPlayer, amount)
-    if amount <= 0 then
-        return true
-    end
+    if amount <= 0 then return true end
+    if not xPlayer then return false end
 
-    if Config.PaymentMethod == 'bank' then
+    local method = Config.PaymentMethod or 'cash'
+
+    if method == 'bank' then
         if xPlayer.getAccount('bank').money < amount then
             return false
         end
-
         xPlayer.removeAccountMoney('bank', amount, 'Impound Fee')
         return true
-    elseif Config.PaymentMethod == 'any' then
+    elseif method == 'any' then
         local cash = xPlayer.getMoney()
         local bank = xPlayer.getAccount('bank').money
 
@@ -172,7 +176,6 @@ local function deductImpoundPayment(xPlayer, amount)
         if cash > 0 then
             xPlayer.removeMoney(cash, 'Impound Fee (cash)')
         end
-
         xPlayer.removeAccountMoney('bank', amount - cash, 'Impound Fee (bank)')
         return true
     end
@@ -180,7 +183,6 @@ local function deductImpoundPayment(xPlayer, amount)
     if xPlayer.getMoney() < amount then
         return false
     end
-
     xPlayer.removeMoney(amount, 'Impound Fee')
     return true
 end
@@ -218,6 +220,8 @@ local function getOwnedVehicleByPlateAnyOwner(plate)
 end
 
 local function spawnOwnedVehicle(source, spawn, data)
+    if not data or not data.vehicleProps or not data.spawnPoint then return end
+
     ESX.OneSync.SpawnVehicle(data.vehicleProps.model, spawn, data.spawnPoint.heading, data.vehicleProps, function(netId)
         local vehicle = NetworkGetEntityFromNetworkId(netId)
         Wait(300)
@@ -249,6 +253,20 @@ AddEventHandler('ari_garage:updateOwnedVehicle', function(stored, parking, impou
     end
 
     if state == VEHICLE_STATE.STORED then
+        -- Auto-impound on empty fuel (Config.ImpoundOnEmpty)
+        if Config.ImpoundOnEmpty
+            and impound == nil
+            and data.vehicleProps.fuelLevel ~= nil
+            and data.vehicleProps.fuelLevel <= 0
+        then
+            local fallbackImpound = next(Config.Impounds or {})
+            if fallbackImpound then
+                updateVehicleState(identifier, data.vehicleProps.plate, VEHICLE_STATE.IMPOUNDED, nil, fallbackImpound, data.vehicleProps)
+                xPlayer.showNotification(TranslateCap('veh_impounded'))
+                return
+            end
+        end
+
         xPlayer.showNotification(TranslateCap('veh_stored'))
         return
     end
@@ -282,16 +300,12 @@ AddEventHandler('ari_garage:setImpound', function(impoundName, vehicleProps)
 
     xPlayer.showNotification(TranslateCap('veh_impounded'))
 
-    if not Config.NotifyOnImpound then
+    -- Notify the actual owner (we already have it from getOwnedVehicleByPlateAnyOwner — no extra SELECT needed)
+    if not Config.NotifyOnImpound or ownedVehicle.owner == identifier then
         return
     end
 
-    local result = MySQL.single.await('SELECT `owner` FROM owned_vehicles WHERE `plate` = ? LIMIT 1', { vehicleProps.plate })
-    if not result or result.owner == identifier then
-        return
-    end
-
-    local targetPlayer = ESX.GetPlayerFromIdentifier(result.owner)
+    local targetPlayer = ESX.GetPlayerFromIdentifier(ownedVehicle.owner)
     if targetPlayer and targetPlayer.source ~= source then
         targetPlayer.showNotification(TranslateCap('veh_impounded'))
     end
@@ -338,20 +352,19 @@ end)
 ESX.RegisterServerCallback('ari_garage:getVehiclesInPound', function(source, cb, impoundName)
     local xPlayer, identifier = getPlayerFromSource(source)
     if not xPlayer then
-        return cb({})
+        return cb({ allowed = false, vehicles = {} })
     end
 
     local impound = Config.Impounds[impoundName]
     if not impound then
-        return cb({})
+        return cb({ allowed = false, vehicles = {} })
     end
 
-    local releaseMeta = computeReleaseData(xPlayer, impound, {})
-    if not releaseMeta.allowed then
+    if not isJobAllowedForImpound(xPlayer, impound) then
         return cb({
             allowed = false,
             vehicles = {},
-            reason = releaseMeta.reason,
+            reason = 'not_allowed',
         })
     end
 
@@ -365,18 +378,20 @@ ESX.RegisterServerCallback('ari_garage:getVehiclesInPound', function(source, cb,
         { identifier, VEHICLE_STATE.IMPOUNDED, impoundName }
     )
 
-    local vehicles = decodeVehicleRows(result)
-    for i = 1, #vehicles do
-        local releaseData = computeReleaseData(xPlayer, impound, vehicles[i].vehicle)
-        vehicles[i].releaseCost = releaseData.amount
-        vehicles[i].releaseFree = releaseData.isFree
+    local vehicles = decodeVehicleRows(result, impound)
+    local applyFreeRelease = impound.FreeRelease == true and isJobAllowedForImpound(xPlayer, impound)
+    if applyFreeRelease then
+        for i = 1, #vehicles do
+            vehicles[i].releaseCost = 0
+            vehicles[i].releaseFree = true
+        end
     end
 
     cb({
         allowed = true,
         vehicles = vehicles,
         cost = impound.Cost or 0,
-        freeRelease = impound.FreeRelease == true and isJobAllowedForImpound(xPlayer, impound),
+        freeRelease = applyFreeRelease,
     })
 end)
 
@@ -393,12 +408,13 @@ end)
 ESX.RegisterServerCallback('ari_garage:checkMoney', function(source, cb, amount, impoundName, vehicleProps)
     local xPlayer = ESX.Player(source)
     if not xPlayer then
-        return cb({ allowed = false, amount = amount or 0, isFree = false })
+        return cb({ allowed = false, amount = amount or 0, isFree = false, hasMoney = false })
     end
 
     if impoundName and Config.Impounds[impoundName] then
         local releaseData = computeReleaseData(xPlayer, Config.Impounds[impoundName], vehicleProps or {})
         if not releaseData.allowed then
+            releaseData.hasMoney = false
             return cb(releaseData)
         end
 

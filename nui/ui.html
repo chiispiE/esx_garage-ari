@@ -11,6 +11,11 @@
 <div id="overlay" class="hidden">
   <div id="panel" role="dialog" aria-modal="true">
 
+    <!-- Floating particles backdrop -->
+    <div class="bg-particles" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+
     <!-- ── Sidebar ── -->
     <aside id="sidebar">
       <div class="sidebar-header">
@@ -44,8 +49,24 @@
         </button>
       </nav>
 
+      <div class="sidebar-stats">
+        <div class="stat-mini accent">
+          <span class="stat-label">Total</span>
+          <span class="stat-value" id="stat-total" data-target="0">0</span>
+        </div>
+        <div class="stat-mini">
+          <span class="stat-label">Avg cond.</span>
+          <span class="stat-value" id="stat-condition" data-target="0">0%</span>
+        </div>
+      </div>
+
       <div class="sidebar-footer">
-        <span class="version-tag">v1.15.0-ari</span>
+        <div class="shortcuts">
+          <span class="shortcut"><kbd>/</kbd> Search</span>
+          <span class="shortcut"><kbd>1</kbd>/<kbd>2</kbd> Switch tab</span>
+          <span class="shortcut"><kbd>Esc</kbd> Close</span>
+        </div>
+        <span class="version-tag">v1.15.2-ari</span>
       </div>
     </aside>
 
@@ -54,7 +75,7 @@
 
       <!-- Header bar -->
       <div class="content-topbar">
-        <h1 id="content-title">Garage</h1>
+        <h1 id="content-title"><span class="title-pulse" aria-hidden="true"></span>Garage</h1>
         <div class="topbar-actions">
           <div class="search-wrap">
             <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -62,7 +83,14 @@
             </svg>
             <input id="search-input" type="search" placeholder="Search model or plate…" autocomplete="off" spellcheck="false"/>
           </div>
-          <button id="btn-close" class="close-btn" title="Close (Esc)">
+          <button id="btn-refresh" class="icon-btn refresh-btn" title="Refresh (R)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+          <button id="btn-close" class="icon-btn close-btn" title="Close (Esc)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -75,7 +103,7 @@
 
       <!-- Empty state -->
       <div id="empty-state" class="empty-state hidden">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.35">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4">
           <rect x="1" y="3" width="15" height="13" rx="2"/>
           <path d="M16 8h4l3 5v3h-7V8Z"/>
           <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>

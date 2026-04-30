@@ -1,6 +1,6 @@
 --[[
     ari_garage — Config
-    Version: 1.15.0-ari
+    Version: 1.15.2-ari
     ─────────────────────────────────────────────────────────────
     All settings are documented inline.
     Do NOT edit anything outside of this file for base behaviour.
@@ -217,6 +217,24 @@ Config.Impounds = {
         Scale   = 0.8,
         Colour  = 1,
     },
+}
+
+-- ─── VERSION CHECK (GitHub) ────────────────────────────────────────────────────
+-- Lightweight, server-side check that pings the GitHub Releases API on resource
+-- start and prints a colored message in the FiveM console if there is a newer
+-- version published in the upstream repository. No data is sent — just a single
+-- HTTPS GET to api.github.com.
+Config.VersionCheck = {
+    Enabled  = true,
+    Owner    = 'aariidev',
+    Repo     = 'esx_garage-ari',
+    -- Endpoint used. 'releases' = latest published release (recommended).
+    -- Falls back to the newest tag automatically if no release exists yet.
+    Endpoint = 'releases',
+    -- Print "you are up to date" too, not only when there is a newer version
+    Verbose  = true,
+    -- Optional: re-check every N minutes (0 = only on resource start)
+    IntervalMinutes = 0,
 }
 
 -- ─── EXPORTS ───────────────────────────────────────────────────────────────────

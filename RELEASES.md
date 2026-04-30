@@ -1,5 +1,77 @@
 # Releases
 
+## v1.15.2-ari
+
+### Resumen
+- Pulido visual fuerte de la NUI: panel glassy real con blur, animaciones nuevas, micro-interacciones por todas partes.
+- Atajos de teclado dentro del menú y botón de refrescar.
+- Limpieza profunda del Lua: una sola función para el coste de liberación, menos consultas SQL, `Config.ImpoundOnEmpty` por fin hace algo.
+- **Nuevo:** version checker conectado a GitHub (`aariidev/esx_garage-ari`) que avisa por consola cuando hay una versión más nueva publicada.
+
+### UI
+- Panel con `backdrop-filter` blur + saturación, sombra y borde más limpios.
+- Indicador "live" pulsando al lado del título de la pestaña.
+- Mini-estadísticas en el sidebar: total de vehículos y condición media (con contador animado).
+- Pista de atajos visible en el sidebar (`/`, `1/2`, `Esc`).
+- Botón de refrescar en la topbar.
+- Barras de condición y combustible con relleno animado y brillo (shimmer).
+- "Orb" de luz que sigue al cursor en cada tarjeta (parallax sutil).
+- Tarjetas con shine sweep al pasar por encima del botón.
+- Transición animada al cambiar de pestaña.
+- Partículas flotantes muy sutiles de fondo (acento).
+- Insignias del sidebar con bump cuando el contador cambia.
+- Empty-state con icono flotante.
+- Respeta `prefers-reduced-motion`.
+- **Fix:** panel mucho menos opaco (`--bg-panel` 0.86 → 0.55, `--bg-sidebar` 0.92 → 0.62) y blur subido a 36px. Antes en sitios oscuros del mapa parecía un cuadrado negro tapando el juego; ahora la escena se ve detrás como debe.
+- Reglas extra de `background: transparent !important` en `:root`/`html`/`body`/pseudoelementos para que ningún tema/extensión meta un backdrop por accidente.
+
+### UX / NUI
+- `/` enfoca la búsqueda.
+- `1` / `2` cambian entre garaje e impound.
+- `R` refresca la lista actual.
+- `Esc` cierra (igual que antes).
+- Nuevo callback NUI `refresh` que reabre la vista actual sin cerrar el menú.
+
+### Server (Lua)
+- Nueva `calculateReleaseCost(impound, props)` como única fuente del coste de liberación. `decodeVehicleRows` y `computeReleaseData` ya no duplican fórmulas.
+- `setImpound` ya no hace un `SELECT` extra para notificar al dueño: usamos el dato que ya teníamos.
+- `Config.ImpoundOnEmpty` ahora sí: si guardas un coche con `fuelLevel <= 0`, queda directamente en el primer impound configurado.
+- `getPlayerFromSource` y compañía con guards extra contra `nil` (ESX no cargado, jugador desconectado en mitad del flujo).
+- `checkMoney` siempre devuelve `hasMoney` (ya no queda `nil` en algunos paths).
+- `getVehiclesInPound` aplica `FreeRelease` también en cada vehículo del listado, no solo en el meta.
+
+### Update checker (GitHub)
+- Nuevo `server/version_check.lua`: en el arranque del recurso consulta `api.github.com/repos/aariidev/esx_garage-ari/releases/latest` y compara con la versión local de `fxmanifest.lua`.
+- Mensajes en consola con códigos de color de FiveM:
+  - Verde si estás al día.
+  - Amarillo + link si hay versión nueva.
+  - Verde "AHEAD" si tu copia es más nueva que la publicada (caso típico mientras desarrollas).
+- Configurable en `Config.VersionCheck` (`Enabled`, `Owner`, `Repo`, `Endpoint`, `Verbose`, `IntervalMinutes`).
+- Si no hay releases publicadas, cae automáticamente a `/tags`.
+- Comando manual desde la consola del server: `ari_garage_version`.
+- Añadido `repository 'https://github.com/aariidev/esx_garage-ari'` en `fxmanifest.lua` (lo usan algunas tools de FiveM como `txAdmin` para mostrar el origen del recurso).
+
+### Client (Lua)
+- `OpenGarageMenu` y `OpenImpoundMenu` declarados arriba para poder usarlos desde callbacks anteriores.
+- Se guarda `lastOpenContext` para que el botón de refrescar reabra exactamente el mismo garaje/impound.
+- `lastOpenContext` se limpia al cerrar el menú.
+- `spawnOwnedVehicle` con guard contra payload incompleto.
+
+### Archivos clave
+- `nui/css/app.css`, `nui/js/app.js`, `nui/ui.html`
+- `server/main.lua`, `client/main.lua`
+- `fxmanifest.lua`, `config.lua`
+
+### Upgrade
+1. Sustituye los archivos de la carpeta `nui/`, `server/main.lua`, `client/main.lua`, `config.lua` y `fxmanifest.lua`.
+2. No hace falta tocar la base de datos (la migración de 1.15.0 sigue siendo válida).
+3. `restart ari_garage`.
+
+### Compatibilidad
+- 100% compatible con eventos, callbacks y exports de 1.15.0-ari. No hay breaking changes.
+
+---
+
 ## v1.15.0-ari
 
 ### Resumen

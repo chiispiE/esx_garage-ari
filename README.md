@@ -13,11 +13,11 @@
 
 **Advanced Vehicle Garage & Impound System for ESX**
 
-`v1.15.0-ari` · FiveM · ESX · oxmysql
+`v1.15.2-ari` · FiveM · ESX · oxmysql
 
 [![FiveM](https://img.shields.io/badge/FiveM-ESX-orange?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNHYtNGgtNGw2LTZoMHY0aDRsLTYgNnoiLz48L3N2Zz4=)](https://fivem.net)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.15.0--ari-brightgreen?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.15.2--ari-brightgreen?style=flat-square)]()
 
 <br/>
 
@@ -28,19 +28,17 @@
 
 ---
 
-## ✨ What's New in 1.15.0-ari
+## ✨ What's New in 1.15.2-ari
 
-> A complete overhaul from `esx_garage_v2`. Every system has been rewritten, improved, and documented.
+> Visual & code polish on top of 1.15.0-ari.
 
 | Area | Change |
 |------|--------|
-| 🎨 **UI** | Entirely new NUI — dark glass design, animated cards, search, sidebar tabs |
-| ⚙️ **Config** | 30+ new options: job restrictions, vehicle filters, payment methods, sound, target system |
-| 🚔 **Impound** | Per-impound labels, `FreeRelease` for police jobs, `NotifyOnImpound` for vehicle owners |
-| 💳 **Billing** | Choose `cash`, `bank`, or `any` (smart deduct both) for impound fees |
-| 🗄️ **SQL** | Safe `IF NOT EXISTS` migration, optional performance indexes |
-| 🌍 **Locales** | Spanish (`es`) added, all strings updated with color codes |
-| 🔧 **Code** | Fully documented Lua, single-responsibility callbacks, safe `nil` guards |
+| 🎨 **UI** | Glassy panel with backdrop blur, animated condition/fuel bars (shimmer), cursor parallax orb on each card, animated badges and stat counters, tab transition, floating accent particles |
+| ⌨️ **UX** | Keyboard shortcuts (`/` search, `1`/`2` switch tab, `R` refresh, `Esc` close), refresh button in topbar, sidebar mini-stats (Total / Avg condition), sidebar shortcut hints |
+| 🔧 **Lua** | Single source of truth for impound release pricing (`calculateReleaseCost`), removed redundant `SELECT` in `setImpound`, `Config.ImpoundOnEmpty` now actually impounds when fuel hits 0, safer `nil` guards across server callbacks, forward-declared menu openers and a new `refresh` NUI callback |
+| 🚀 **Perf** | Fewer DB roundtrips on impound, less work in render loop, reduced-motion-aware animations |
+| 🔄 **Updates** | Built-in GitHub version checker — pings `aariidev/esx_garage-ari` releases on boot and warns in console if a newer version is available. Configurable via `Config.VersionCheck`, manual re-check with `ari_garage_version`. |
 
 ---
 
@@ -249,7 +247,7 @@ Set `Config.UseTarget = true` to disable markers and use your preferred target r
 ## 🤝 Credits
 
 - Original `esx_garage_v2` by the ESX-Framework team
-- Redesign & v1.15.0-ari by **Ari**
+- Redesign & v1.15.2-ari by **Ari**
 
 ---
 

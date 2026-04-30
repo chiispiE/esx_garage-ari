@@ -1,6 +1,6 @@
 --[[
     ari_garage — Client
-    Version: 1.15.0-ari
+    Version: 1.15.2-ari
 --]]
 
 local LastMarker, LastPart = nil, nil
@@ -8,6 +8,8 @@ local thisGarage, thisPound = nil, nil
 local nearMarker, menuIsShowed = false, false
 local HasAlreadyEnteredMarker = false
 local currentVehicles, currentImpoundedVehicles = {}, {}
+local lastOpenContext = nil -- { kind = 'garage'|'impound', key = string, ref = table }
+local OpenGarageMenu, OpenImpoundMenu -- forward declarations
 local next = next
 
 local function PlayUISound()
@@ -168,6 +170,7 @@ end
 RegisterNetEvent('ari_garage:closemenu')
 AddEventHandler('ari_garage:closemenu', function()
     menuIsShowed = false
+    lastOpenContext = nil
     ResetMenuState()
 
     SetNuiFocus(false, false)
@@ -202,6 +205,17 @@ end)
 
 RegisterNUICallback('escape', function(_, cb)
     TriggerEvent('ari_garage:closemenu')
+    cb('ok')
+end)
+
+RegisterNUICallback('refresh', function(_, cb)
+    if lastOpenContext then
+        if lastOpenContext.kind == 'garage' and lastOpenContext.ref then
+            OpenGarageMenu(lastOpenContext.key, lastOpenContext.ref)
+        elseif lastOpenContext.kind == 'impound' and lastOpenContext.ref then
+            OpenImpoundMenu(lastOpenContext.key, lastOpenContext.ref)
+        end
+    end
     cb('ok')
 end)
 
@@ -348,7 +362,7 @@ CreateThread(function()
     end
 end)
 
-local function OpenGarageMenu(garageKey, garage)
+OpenGarageMenu = function(garageKey, garage)
     ESX.TriggerServerCallback('ari_garage:getVehiclesInParking', function(vehicles)
         ESX.TriggerServerCallback('ari_garage:getVehiclesImpounded', function(impoundedVehicles)
             ResetMenuState()
@@ -366,6 +380,7 @@ local function OpenGarageMenu(garageKey, garage)
             end
 
             menuIsShowed = true
+            lastOpenContext = { kind = 'garage', key = garageKey, ref = garage }
             PlayUISound()
 
             SendNUIMessage(BuildGaragePayload(garageKey, garage, currentVehicles, currentImpoundedVehicles))
@@ -375,7 +390,7 @@ local function OpenGarageMenu(garageKey, garage)
     end, garageKey)
 end
 
-local function OpenImpoundMenu(poundKey, pound)
+OpenImpoundMenu = function(poundKey, pound)
     ESX.TriggerServerCallback('ari_garage:getVehiclesInPound', function(response)
         if not response or response.allowed == false then
             ESX.ShowNotification(TranslateCap('not_allowed'), 'error')
@@ -395,6 +410,7 @@ local function OpenImpoundMenu(poundKey, pound)
         end
 
         menuIsShowed = true
+        lastOpenContext = { kind = 'impound', key = poundKey, ref = pound }
         PlayUISound()
 
         SendNUIMessage(BuildImpoundPayload(poundKey, pound, currentVehicles, response))

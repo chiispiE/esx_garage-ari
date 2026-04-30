@@ -1,4 +1,4 @@
-/* ari_garage — NUI app.js  v1.15.0-ari */
+/* ari_garage — NUI app.js  v1.15.2-ari */
 
 (function () {
   'use strict';
@@ -20,7 +20,10 @@
     freeRelease: false,
   };
 
+  let lastBadgeCounts = { garage: 0, impounded: 0 };
+
   const overlay = document.getElementById('overlay');
+  const panel = document.getElementById('panel');
   const garageLabel = document.getElementById('garage-label');
   const contentTitle = document.getElementById('content-title');
   const tabImpounded = document.getElementById('tab-impounded');
@@ -31,7 +34,11 @@
   const emptyMsg = document.getElementById('empty-msg');
   const searchInput = document.getElementById('search-input');
   const btnClose = document.getElementById('btn-close');
+  const btnRefresh = document.getElementById('btn-refresh');
+  const statTotal = document.getElementById('stat-total');
+  const statCondition = document.getElementById('stat-condition');
 
+  // ── helpers ───────────────────────────────────────────────────────────────
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -64,7 +71,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(payload),
-    });
+    }).catch(() => {});
   }
 
   function escapeAttr(value) {
@@ -97,10 +104,13 @@
     return loc.action || loc.veh_exit || 'Retrieve';
   }
 
+  // ── card builders ─────────────────────────────────────────────────────────
   function buildMetaPills(vehicle, condition) {
     const loc = state.locales;
+    const stateClass = vehicle.state === 'impounded' ? 'meta-pill' : (condition >= 70 ? 'meta-pill success' : 'meta-pill');
+
     const pills = [
-      `<span class="meta-pill"><span>${loc.state_label || 'State'}</span><strong>${getStateLabel(vehicle)}</strong></span>`,
+      `<span class="${stateClass}"><span>${loc.state_label || 'State'}</span><strong>${getStateLabel(vehicle)}</strong></span>`,
       `<span class="meta-pill"><span>${loc.veh_condition || 'Condition'}</span><strong>${condition}%</strong></span>`,
     ];
 
@@ -166,7 +176,7 @@
             <span>${loc.fuel || 'Fuel'}</span>
             <strong>${fuelPct}%</strong>
           </div>
-          <div class="fuel-bar"><div class="fuel-fill" style="width:${fuelPct}%"></div></div>
+          <div class="fuel-bar"><div class="fuel-fill" data-fill="${fuelPct}"></div></div>
         </div>`;
     }
 
@@ -189,7 +199,7 @@
             <strong>${condition}%</strong>
           </div>
           <div class="condition-bar">
-            <div class="condition-fill ${conditionState}" style="width:${condition}%"></div>
+            <div class="condition-fill ${conditionState}" data-fill="${condition}"></div>
           </div>
         </div>
         ${fuelBlock}
@@ -197,7 +207,77 @@
       </article>`;
   }
 
-  function renderGrid() {
+  // ── parallax orb on hover ─────────────────────────────────────────────────
+  function attachCardParallax() {
+    vehicleGrid.querySelectorAll('.vcard').forEach((card) => {
+      card.addEventListener('mousemove', (event) => {
+        const rect = card.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 100;
+        const y = ((event.clientY - rect.top) / rect.height) * 100;
+        card.style.setProperty('--orb-x', `${x}%`);
+        card.style.setProperty('--orb-y', `${y}%`);
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.setProperty('--orb-x', `80%`);
+        card.style.setProperty('--orb-y', `0%`);
+      });
+    });
+  }
+
+  // ── animate progress bars ─────────────────────────────────────────────────
+  function animateBars() {
+    requestAnimationFrame(() => {
+      vehicleGrid.querySelectorAll('[data-fill]').forEach((bar) => {
+        const target = clamp(Number(bar.dataset.fill || 0), 0, 100);
+        bar.style.width = `${target}%`;
+      });
+    });
+  }
+
+  // ── animated number counter ───────────────────────────────────────────────
+  function animateCounter(el, value, suffix) {
+    suffix = suffix || '';
+    const start = Number(el.dataset.target || 0);
+    const end = Number(value) || 0;
+    if (start === end) {
+      el.textContent = `${end}${suffix}`;
+      return;
+    }
+    const duration = 520;
+    const startTime = performance.now();
+    function step(now) {
+      const t = clamp((now - startTime) / duration, 0, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = Math.round(start + (end - start) * eased);
+      el.textContent = `${current}${suffix}`;
+      if (t < 1) requestAnimationFrame(step);
+      else el.dataset.target = String(end);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function updateSidebarStats() {
+    const list = state.tab === 'impounded' ? state.impoundedVehicles : state.garageVehicles;
+    const total = list.length;
+    const avg = total === 0 ? 0 : Math.round(
+      list.reduce((acc, v) => acc + calcCondition(v.props), 0) / total
+    );
+    animateCounter(statTotal, total, '');
+    animateCounter(statCondition, avg, '%');
+  }
+
+  function updateBadge(el, key, count) {
+    el.textContent = count;
+    if (lastBadgeCounts[key] !== count) {
+      el.classList.remove('bump');
+      void el.offsetWidth;
+      el.classList.add('bump');
+      lastBadgeCounts[key] = count;
+    }
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
+  function renderGrid(skipFlip) {
     const query = searchInput.value.trim().toLowerCase();
     const list = state.tab === 'impounded' ? state.impoundedVehicles : state.garageVehicles;
     const type = state.tab === 'impounded' ? 'impounded' : 'garage';
@@ -210,6 +290,16 @@
     });
 
     vehicleGrid.innerHTML = filtered.map((vehicle, index) => buildCard(vehicle, type, index)).join('');
+
+    if (!skipFlip) {
+      vehicleGrid.classList.remove('flip');
+      void vehicleGrid.offsetWidth;
+      vehicleGrid.classList.add('flip');
+    }
+
+    attachCardParallax();
+    animateBars();
+    updateSidebarStats();
 
     const isEmpty = filtered.length === 0;
     emptyState.classList.toggle('hidden', !isEmpty);
@@ -231,20 +321,21 @@
   }
 
   function switchTab(tab) {
+    if (state.tab === tab) return;
     state.tab = tab;
     document.querySelectorAll('.nav-btn').forEach((button) => {
       button.classList.toggle('active', button.dataset.tab === tab);
     });
-    contentTitle.textContent = getTabTitle(tab);
+    contentTitle.lastChild
+      ? (contentTitle.lastChild.nodeValue = getTabTitle(tab))
+      : (contentTitle.textContent = getTabTitle(tab));
     searchInput.value = '';
     renderGrid();
   }
 
   function applyAccentColor(color) {
     const hex = (color || DEFAULT_ACCENT).replace('#', '');
-    if (hex.length !== 6) {
-      return;
-    }
+    if (hex.length !== 6) return;
 
     const red = parseInt(hex.slice(0, 2), 16);
     const green = parseInt(hex.slice(2, 4), 16);
@@ -273,20 +364,19 @@
     state.garageVehicles = data.vehiclesList ? JSON.parse(data.vehiclesList) : [];
     state.impoundedVehicles = data.vehiclesImpoundedList ? JSON.parse(data.vehiclesImpoundedList) : [];
 
-    badgeGarage.textContent = state.garageVehicles.length;
-    badgeImpounded.textContent = state.impoundedVehicles.length;
+    updateBadge(badgeGarage, 'garage', state.garageVehicles.length);
+    updateBadge(badgeImpounded, 'impounded', state.impoundedVehicles.length);
     tabImpounded.style.display = state.menuType === 'impound' ? 'none' : '';
 
-    switchTab('garage');
+    state.tab = '__force__';
+    switchTab(state.menuType === 'impound' ? 'impounded' : 'garage');
     overlay.classList.remove('hidden');
-    searchInput.focus();
+    setTimeout(() => searchInput.focus(), 80);
   }
 
   function bootPreviewMode() {
     const isPreview = window.location.protocol === 'file:' && window.location.search.includes('preview=1');
-    if (!isPreview) {
-      return;
-    }
+    if (!isPreview) return;
 
     showMenu({
       action: 'show',
@@ -316,27 +406,14 @@
         out_action: 'Outside',
       },
       vehiclesList: JSON.stringify([
-        {
-          model: 'Comet S2',
-          plate: 'ARI 001',
-          state: 'stored',
-          props: { bodyHealth: 900, engineHealth: 820, tankHealth: 1000, fuelLevel: 76 },
-        },
-        {
-          model: 'Bati 801',
-          plate: 'NEON 88',
-          state: 'stored',
-          props: { bodyHealth: 780, engineHealth: 640, tankHealth: 1000, fuelLevel: 48 },
-        },
+        { model: 'Comet S2', plate: 'ARI 001', state: 'stored',
+          props: { bodyHealth: 940, engineHealth: 880, tankHealth: 1000, fuelLevel: 76 } },
+        { model: 'Bati 801', plate: 'NEON 88', state: 'stored',
+          props: { bodyHealth: 780, engineHealth: 640, tankHealth: 1000, fuelLevel: 48 } },
       ]),
       vehiclesImpoundedList: JSON.stringify([
-        {
-          model: 'Sultan RS',
-          plate: 'POUND 7',
-          state: 'impounded',
-          releaseCost: 4200,
-          props: { bodyHealth: 700, engineHealth: 420, tankHealth: 1000, fuelLevel: 31 },
-        },
+        { model: 'Sultan RS', plate: 'POUND 7', state: 'impounded', releaseCost: 4200,
+          props: { bodyHealth: 700, engineHealth: 420, tankHealth: 1000, fuelLevel: 31 } },
       ]),
     });
   }
@@ -350,15 +427,41 @@
     post('escape', {});
   }
 
+  function refreshMenu() {
+    btnRefresh.querySelector('svg').animate(
+      [{ transform: 'rotate(0)' }, { transform: 'rotate(360deg)' }],
+      { duration: 600, easing: 'cubic-bezier(.4,0,.2,1)' }
+    );
+    post('refresh', {});
+  }
+
+  // ── events ────────────────────────────────────────────────────────────────
   btnClose.addEventListener('click', hideMenu);
+  btnRefresh.addEventListener('click', refreshMenu);
 
   document.addEventListener('keydown', (event) => {
+    if (overlay.classList.contains('hidden')) return;
+
     if (event.key === 'Escape') {
       hideMenu();
+      return;
+    }
+
+    if (document.activeElement === searchInput) return;
+
+    if (event.key === '/') {
+      event.preventDefault();
+      searchInput.focus();
+    } else if (event.key === '1') {
+      switchTab('garage');
+    } else if (event.key === '2' && state.menuType !== 'impound') {
+      switchTab('impounded');
+    } else if (event.key === 'r' || event.key === 'R') {
+      refreshMenu();
     }
   });
 
-  searchInput.addEventListener('input', renderGrid);
+  searchInput.addEventListener('input', () => renderGrid(true));
 
   document.querySelectorAll('.nav-btn').forEach((button) => {
     button.addEventListener('click', () => switchTab(button.dataset.tab));
@@ -391,14 +494,15 @@
 
   window.addEventListener('message', (event) => {
     const data = event.data;
-    if (!data || !data.action) {
-      return;
-    }
+    if (!data || !data.action) return;
 
     if (data.action === 'show') {
       showMenu(data);
     } else if (data.action === 'hide') {
       overlay.classList.add('hidden');
+    } else if (data.action === 'refresh') {
+      // server pushed a fresh dataset
+      showMenu(Object.assign({}, data, { action: 'show' }));
     }
   });
 
