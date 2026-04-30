@@ -1,4 +1,4 @@
-/* ari_garage — NUI app.js  v1.14.0-ari */
+/* ari_garage — NUI app.js  v1.15.0-ari */
 
 (function () {
   'use strict';
@@ -85,6 +85,10 @@
   function getActionLabel(type, vehicle) {
     const loc = state.locales;
     if (type === 'impounded') {
+      if (vehicle.state === 'out') {
+        return loc.out_action || 'Outside';
+      }
+
       return state.menuType === 'impound'
         ? (loc.pay_impound || 'Pay & Release')
         : (loc.locate_impound || 'Mark impound');
@@ -114,6 +118,16 @@
     const label = getActionLabel(type, vehicle);
 
     if (type === 'impounded') {
+      if (vehicle.state === 'out') {
+        return `
+          <button class="btn-action btn-disabled" disabled>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle><path d="M8 12h8"></path>
+            </svg>
+            ${label}
+          </button>`;
+      }
+
       return `
         <button class="btn-action btn-secondary vcard-impound-btn"
           data-mode="${state.menuType === 'impound' ? 'release' : 'track'}"
@@ -299,6 +313,7 @@
         release_cost: 'Release cost',
         free_release: 'Free release',
         no_results: 'No results.',
+        out_action: 'Outside',
       },
       vehiclesList: JSON.stringify([
         {

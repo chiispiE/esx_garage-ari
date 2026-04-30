@@ -1,6 +1,6 @@
 --[[
     ari_garage — Client
-    Version: 1.14.0-ari
+    Version: 1.15.0-ari
 --]]
 
 local LastMarker, LastPart = nil, nil
@@ -109,6 +109,7 @@ local function BuildLocales()
         release_cost = TranslateCap('release_cost'),
         free_release = TranslateCap('free_release'),
         no_results = TranslateCap('no_results'),
+        out_action = TranslateCap('out_action'),
     }
 end
 
@@ -360,7 +361,7 @@ local function OpenGarageMenu(garageKey, garage)
 
             for i = 1, #impoundedVehicles do
                 if VehicleMatchesFilter(impoundedVehicles[i].vehicle, garage.VehicleFilter) then
-                    currentImpoundedVehicles[#currentImpoundedVehicles + 1] = MapVehicleForUI(impoundedVehicles[i], 'impounded')
+                    currentImpoundedVehicles[#currentImpoundedVehicles + 1] = MapVehicleForUI(impoundedVehicles[i])
                 end
             end
 

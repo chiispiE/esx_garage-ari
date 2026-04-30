@@ -1,9 +1,9 @@
 Locales['en'] = {
     ['parking_blip_name']   = 'Garage',
     ['Impound_blip_name']   = 'Impound',
-    ['access_parking']      = 'Press [E] to access the garage.',
-    ['access_Impound']      = 'Press [E] to access the impound.',
-    ['park_veh']            = 'Press [E] to store your vehicle.',
+    ['access_parking']      = 'Press [E]  to access the garage.',
+    ['access_Impound']      = 'Press [E]  to access the impound.',
+    ['park_veh']            = 'Press [E]  to store your vehicle.',
     ['not_owning_veh']      = '~r~You do not own this vehicle!',
     ['not_allowed']         = '~r~You are not allowed to access this garage.',
     ['veh_released']        = '~g~Vehicle successfully retrieved.',
@@ -32,4 +32,5 @@ Locales['en'] = {
     ['free_release']        = 'Free release',
     ['locate_impound']      = 'Mark impound',
     ['no_results']          = 'No results.',
+    ['out_action']          = 'Outside',
 }

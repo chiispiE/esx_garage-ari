@@ -1,9 +1,9 @@
 Locales['es'] = {
     ['parking_blip_name']   = 'Garaje',
     ['Impound_blip_name']   = 'Depósito',
-    ['access_parking']      = 'Pulsa [E] y echa un vistazo.',
-    ['access_Impound']      = 'Pulsa [E] y rescata tu joyita.',
-    ['park_veh']            = 'Pulsa [E] y aparca la nave.',
+    ['access_parking']      = 'Pulsa [E]  y echa un vistazo.',
+    ['access_Impound']      = 'Pulsa [E]  y rescata tu joyita.',
+    ['park_veh']            = 'Pulsa [E]  y aparca la nave.',
     ['not_owning_veh']      = '~r~Ese coche no lleva tu nombre.',
     ['not_allowed']         = '~r~Aquí no te conocen, jefe.',
     ['veh_released']        = '~g~Tu carro ya está contigo.',
@@ -32,4 +32,5 @@ Locales['es'] = {
     ['free_release']        = 'Sale gratis',
     ['locate_impound']      = 'Llévame al depó',
     ['no_results']          = 'Nada de nada.',
+    ['out_action']          = 'Anda por ahí',
 }

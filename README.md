@@ -13,24 +13,24 @@
 
 **Advanced Vehicle Garage & Impound System for ESX**
 
-`v1.14.0-ari` · FiveM · ESX · oxmysql
+`v1.15.0-ari` · FiveM · ESX · oxmysql
 
 [![FiveM](https://img.shields.io/badge/FiveM-ESX-orange?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNHYtNGgtNGw2LTZoMHY0aDRsLTYgNnoiLz48L3N2Zz4=)](https://fivem.net)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.14.0--ari-brightgreen?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.15.0--ari-brightgreen?style=flat-square)]()
 
 <br/>
 
-![Preview](https://r2.fivemanage.com/GKrFpmeSPmAY7LG3ytD9M/Capturadepantalla2026-04-30064848.png)
+![Preview](https://r2.fivemanage.com/GKrFpmeSPmAY7LG3ytD9M/Capturadepantalla2026-04-30165632.png)
 
 
 </div>
 
 ---
 
-## ✨ What's New in 1.14.0-ari
+## ✨ What's New in 1.15.0-ari
 
-> A complete overhaul from `esx_garage-ari`. Every system has been rewritten, improved, and documented.
+> A complete overhaul from `esx_garage_v2`. Every system has been rewritten, improved, and documented.
 
 | Area | Change |
 |------|--------|
@@ -248,8 +248,8 @@ Set `Config.UseTarget = true` to disable markers and use your preferred target r
 
 ## 🤝 Credits
 
-- Original `esx_garage` by the ESX-Framework team
-- Redesign & v1.14.0-ari by **Ari**
+- Original `esx_garage_v2` by the ESX-Framework team
+- Redesign & v1.15.0-ari by **Ari**
 
 ---
 

@@ -1,6 +1,6 @@
 --[[
     ari_garage — Config
-    Version: 1.14.0-ari
+    Version: 1.15.0-ari
     ─────────────────────────────────────────────────────────────
     All settings are documented inline.
     Do NOT edit anything outside of this file for base behaviour.
@@ -9,7 +9,7 @@
 Config = {}
 
 -- ─── LOCALE ────────────────────────────────────────────────────────────────────
-Config.Locale = GetConvar('esx:locale', 'en')
+Config.Locale = GetConvar('esx:locale', 'es')
 
 -- ─── GENERAL ───────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ Config.UseTarget = false
 -- ─── IMPOUND ───────────────────────────────────────────────────────────────────
 
 -- When a player parks a vehicle that is out-of-fuel, automatically impound it?
-Config.ImpoundOnEmpty = false
+Config.ImpoundOnEmpty = true
 
 -- Send a notification to the vehicle owner when their car is impounded by police?
 Config.NotifyOnImpound = true
@@ -40,7 +40,7 @@ Config.ImpoundDamageMult = 1.0
 -- ─── BILLING ───────────────────────────────────────────────────────────────────
 
 -- Payment method for impound fees: 'cash' | 'bank' | 'any'
-Config.PaymentMethod = 'cash'
+Config.PaymentMethod = 'any'
 
 -- ─── MARKERS ───────────────────────────────────────────────────────────────────
 -- Type reference: https://docs.fivem.net/docs/game-references/markers/
@@ -96,7 +96,7 @@ Config.UI = {
     AnimateCards = true,
 
     -- Show a fuel gauge in each vehicle card (requires ESX fuel resource exporting GetFuel)
-    ShowFuelGauge = false,
+    ShowFuelGauge = true,
 
     -- Sound when opening the garage menu (FiveM default audio)
     Sound = {

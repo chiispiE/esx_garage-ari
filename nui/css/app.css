@@ -1,4 +1,4 @@
-/* ari_garage — UI Stylesheet v1.14.0-ari */
+/* ari_garage — UI Stylesheet v1.15.0-ari */
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap');
 
@@ -578,6 +578,14 @@ body {
   transform: translateY(-1px);
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(217, 70, 239, 0.10));
   box-shadow: 0 10px 24px rgba(168, 85, 247, 0.16);
+}
+
+.btn-disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-color: rgba(255, 255, 255, 0.06);
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .empty-state {

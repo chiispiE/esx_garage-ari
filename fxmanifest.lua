@@ -4,8 +4,8 @@ game 'gta5'
 author 'Ari / ESX-Framework'
 description 'ari_garage - Advanced Vehicle Garage & Impound System'
 
-version '1.14.0-ari'
-legacyversion '1.14.0-ari'
+version '1.15.0-ari'
+legacyversion '1.15.0-ari'
 
 lua54 'yes'
 
@@ -31,8 +31,5 @@ ui_page 'nui/ui.html'
 files {
     'nui/ui.html',
     'nui/js/*.js',
-    'nui/css/*.css',
-    'nui/img/*.png',
-    'nui/img/*.svg',
-    'nui/img/*.webp'
+    'nui/css/*.css'
 }

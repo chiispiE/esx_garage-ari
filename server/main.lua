@@ -1,6 +1,6 @@
 --[[
     ari_garage — Server
-    Version: 1.14.0-ari
+    Version: 1.15.0-ari
 --]]
 
 local VEHICLE_STATE = {
@@ -8,6 +8,24 @@ local VEHICLE_STATE = {
     STORED = 1,
     IMPOUNDED = 2,
 }
+
+CreateThread(function()
+    local resourceName = GetCurrentResourceName()
+    local version = GetResourceMetadata(resourceName, 'version', 0) or '1.15.0-ari'
+    local author = GetResourceMetadata(resourceName, 'author', 0) or 'Ari'
+
+    Wait(500)
+    print('^5╔══════════════════════════════════════════════════╗^0')
+    print('^5║               ^4🚗  ARI GARAGE  🚗               ^5║^0')
+    print('^5╠══════════════════════════════════════════════════╣^0')
+    print('^5║  ^2> Recurso:   ^0' .. string.format('%-31s', resourceName) .. '^5║^0')
+    print('^5║  ^2> Versión:   ^0' .. string.format('%-31s', version) .. '^5║^0')
+    print('^5║  ^2> Autora:    ^0' .. string.format('%-31s', author) .. '^5║^0')
+    print('^5║  ^2> Sistema:   ^5GARAGE + IMPOUND LISTO         ^5║^0')
+    print('^5╠══════════════════════════════════════════════════╣^0')
+    print('^5║         ^3Todo en orden, Ari. A rodar.          ^5║^0')
+    print('^5╚══════════════════════════════════════════════════╝^0')
+end)
 
 local function getPlayerFromSource(source)
     local xPlayer = ESX.Player(source)
@@ -192,6 +210,13 @@ local function getOwnedVehicleByPlate(identifier, plate)
     )
 end
 
+local function getOwnedVehicleByPlateAnyOwner(plate)
+    return MySQL.single.await(
+        'SELECT `owner`, `plate`, `vehicle`, `stored`, `parking`, `pound` FROM owned_vehicles WHERE `plate` = ? LIMIT 1',
+        { plate }
+    )
+end
+
 local function spawnOwnedVehicle(source, spawn, data)
     ESX.OneSync.SpawnVehicle(data.vehicleProps.model, spawn, data.spawnPoint.heading, data.vehicleProps, function(netId)
         local vehicle = NetworkGetEntityFromNetworkId(netId)
@@ -244,13 +269,13 @@ AddEventHandler('ari_garage:setImpound', function(impoundName, vehicleProps)
         return
     end
 
-    local ownedVehicle = getOwnedVehicleByPlate(identifier, vehicleProps.plate)
+    local ownedVehicle = getOwnedVehicleByPlateAnyOwner(vehicleProps.plate)
     if not ownedVehicle then
         xPlayer.showNotification(TranslateCap('not_owning_veh'))
         return
     end
 
-    local updated = updateVehicleState(identifier, vehicleProps.plate, VEHICLE_STATE.IMPOUNDED, nil, impoundName, vehicleProps)
+    local updated = updateVehicleState(ownedVehicle.owner, vehicleProps.plate, VEHICLE_STATE.IMPOUNDED, nil, impoundName, vehicleProps)
     if updated < 1 then
         return
     end
@@ -301,10 +326,10 @@ ESX.RegisterServerCallback('ari_garage:getVehiclesImpounded', function(source, c
         [[
             SELECT `plate`, `vehicle`, `stored`, `parking`, `pound`
             FROM owned_vehicles
-            WHERE `owner` = ? AND `stored` = ?
-            ORDER BY `plate` ASC
+            WHERE `owner` = ? AND `stored` IN (?, ?)
+            ORDER BY `stored` DESC, `plate` ASC
         ]],
-        { identifier, VEHICLE_STATE.IMPOUNDED }
+        { identifier, VEHICLE_STATE.OUT, VEHICLE_STATE.IMPOUNDED }
     )
 
     cb(decodeVehicleRows(result))
