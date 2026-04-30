@@ -30,7 +30,7 @@
 
 ## ✨ What's New in 1.14.0-ari
 
-> A complete overhaul from `esx_garage_v2`. Every system has been rewritten, improved, and documented.
+> A complete overhaul from `esx_garage-ari`. Every system has been rewritten, improved, and documented.
 
 | Area | Change |
 |------|--------|
@@ -248,7 +248,7 @@ Set `Config.UseTarget = true` to disable markers and use your preferred target r
 
 ## 🤝 Credits
 
-- Original `esx_garage_v2` by the ESX-Framework team
+- Original `esx_garage` by the ESX-Framework team
 - Redesign & v1.14.0-ari by **Ari**
 
 ---
