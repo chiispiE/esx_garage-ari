@@ -1,20 +1,38 @@
 fx_version 'cerulean'
 game 'gta5'
 
-author 'ESX-Framework'
-description 'Allows Players to Store & Retrieve their vehicles'
+author 'Ari / ESX-Framework'
+description 'ari_garage - Advanced Vehicle Garage & Impound System'
 
-version '1.0'
-legacyversion '1.13.4'
+version '1.14.0-ari'
+legacyversion '1.14.0-ari'
 
 lua54 'yes'
 
 shared_script '@es_extended/imports.lua'
 
-server_scripts { '@es_extended/locale.lua', 'locales/*.lua', '@oxmysql/lib/MySQL.lua', 'config.lua', 'server/main.lua' }
+server_scripts {
+    '@es_extended/locale.lua',
+    'locales/*.lua',
+    '@oxmysql/lib/MySQL.lua',
+    'config.lua',
+    'server/main.lua'
+}
 
-client_scripts { '@es_extended/locale.lua', 'locales/*.lua', 'config.lua', 'client/main.lua' }
+client_scripts {
+    '@es_extended/locale.lua',
+    'locales/*.lua',
+    'config.lua',
+    'client/main.lua'
+}
 
 ui_page 'nui/ui.html'
 
-files {'nui/ui.html', 'nui/js/*.js', 'nui/css/*.css', 'nui/roboto.ttf', 'nui/img/*.png'}
+files {
+    'nui/ui.html',
+    'nui/js/*.js',
+    'nui/css/*.css',
+    'nui/img/*.png',
+    'nui/img/*.svg',
+    'nui/img/*.webp'
+}
