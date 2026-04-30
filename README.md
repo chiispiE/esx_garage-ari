@@ -21,7 +21,7 @@
 
 <br/>
 
-![Preview](https://r2.fivemanage.com/GKrFpmeSPmAY7LG3ytD9M/Capturadepantalla2026-04-30060409.png)
+![Preview](https://r2.fivemanage.com/GKrFpmeSPmAY7LG3ytD9M/Capturadepantalla2026-04-30064848.png)
 
 
 </div>
