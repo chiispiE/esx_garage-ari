@@ -58,7 +58,8 @@
   }
 
   function post(endpoint, payload) {
-    return fetch('https://ari_garage/' + endpoint, {
+    const RESOURCE = (typeof GetParentResourceName !== 'undefined') ? GetParentResourceName() : 'ari_garage';
+    return fetch('https://' + RESOURCE + '/' + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(payload),
