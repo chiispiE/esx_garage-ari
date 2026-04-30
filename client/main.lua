@@ -85,11 +85,13 @@ end)
 RegisterNUICallback('spawnVehicle', function(data, cb)
     local spawnCoords = vector3(data.spawnPoint.x, data.spawnPoint.y, data.spawnPoint.z)
 
+    -- Always close the menu and release focus first, then handle logic
+    TriggerEvent('ari_garage:closemenu')
+
     if thisGarage then
         if ESX.Game.IsSpawnPointClear(spawnCoords, 2.5) then
             thisGarage = nil
             TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
-            TriggerEvent('ari_garage:closemenu')
             ESX.ShowNotification(TranslateCap('veh_released'))
         else
             ESX.ShowNotification(TranslateCap('veh_block'), 'error')
@@ -102,7 +104,6 @@ RegisterNUICallback('spawnVehicle', function(data, cb)
                     TriggerServerEvent('ari_garage:payPound', data.exitVehicleCost)
                     thisPound = nil
                     TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
-                    TriggerEvent('ari_garage:closemenu')
                 else
                     ESX.ShowNotification(TranslateCap('veh_block'), 'error')
                 end

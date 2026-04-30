@@ -215,6 +215,13 @@
     searchInput.focus();
   }
 
+  // hideVisual — only hides the overlay, does NOT notify Lua
+  // Use after posting an action (Lua will call closemenu itself)
+  function hideVisual() {
+    overlay.classList.add('hidden');
+  }
+
+  // hideMenu — hides overlay AND tells Lua to close (ESC / close button only)
   function hideMenu() {
     overlay.classList.add('hidden');
     post('escape', {});
@@ -240,22 +247,26 @@
     if (spawnBtn) {
       const props = JSON.parse(spawnBtn.dataset.props);
       post('spawnVehicle', {
-        vehicleProps:  props,
-        spawnPoint:    state.spawnPoint,
+        vehicleProps:    props,
+        spawnPoint:      state.spawnPoint,
         exitVehicleCost: state.poundCost,
       });
-      hideMenu();
+      // Lua's spawnVehicle callback already calls TriggerEvent('ari_garage:closemenu')
+      // which handles SetNuiFocus(false,false). Only hide visually here to avoid
+      // a double-close that corrupts the NUI focus state.
+      hideVisual();
     }
 
     const impoundBtn = e.target.closest('.vcard-impound-btn');
     if (impoundBtn) {
       const props = JSON.parse(impoundBtn.dataset.props);
       post('impound', {
-        vehicleProps:   props,
-        poundName:      state.poundName,
+        vehicleProps:    props,
+        poundName:       state.poundName,
         poundSpawnPoint: state.poundSpawnPoint,
       });
-      hideMenu();
+      // Same — Lua closes the menu and releases focus
+      hideVisual();
     }
   });
 
