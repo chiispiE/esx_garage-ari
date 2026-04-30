@@ -21,8 +21,8 @@
 
 <br/>
 
-![Preview](https://i.imgur.com/placeholder.png)
-*Replace this image with a screenshot of your UI*
+![Preview](https://r2.fivemanage.com/GKrFpmeSPmAY7LG3ytD9M/Capturadepantalla2026-04-30060409.png)
+
 
 </div>
 
