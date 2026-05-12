@@ -4,14 +4,21 @@ game 'gta5'
 author 'Ari / ESX-Framework'
 description 'ari_garage - Advanced Vehicle Garage & Impound System'
 
-version '1.15.2-ari'
+version '1.15.3-ari'
 legacyversion '1.15.2-ari'
 
 repository 'https://github.com/aariidev/esx_garage-ari'
 
 lua54 'yes'
 
-shared_script '@es_extended/imports.lua'
+shared_scripts {
+    '@ox_lib/init.lua',
+    '@es_extended/imports.lua',
+}
+
+dependencies {
+    'ox_lib',
+}
 
 server_scripts {
     '@es_extended/locale.lua',
@@ -19,6 +26,7 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'config.lua',
     'server/main.lua',
+    'server/admin.lua',
     'server/version_check.lua'
 }
 
@@ -26,7 +34,8 @@ client_scripts {
     '@es_extended/locale.lua',
     'locales/*.lua',
     'config.lua',
-    'client/main.lua'
+    'client/main.lua',
+    'client/admin.lua'
 }
 
 ui_page 'nui/ui.html'

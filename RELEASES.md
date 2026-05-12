@@ -1,5 +1,37 @@
 # Releases
 
+## v1.15.3-ari
+
+### Resumen
+- Fix del error `TranslateCap` en el menú admin (`/admingarage`) que causaba crashes al buscar vehículos por matrícula.
+- Mejora en el renderizado de la UI cuando hay muchos vehículos.
+- **Nuevo:** Garajes comunicados — todos los garajes ahora muestran TODOS los vehículos del jugador.
+
+### Bug Fixes
+- **Fix TranslateCap Error:** Agregadas funciones `safeTC()` y `tf()` en `client/main.lua` y `client/admin.lua` para manejar traducciones nil de forma segura y evitar el error `bad argument #1 to 'format' (no value)`.
+- **Fix UI Layout:** Añadido `height: 100%` al área de contenido en `nui/css/app.css` para mejorar el scroll cuando hay muchos vehículos.
+- **Fix SQL Dependency:** Actualizado de `@mysql-async` a `@oxmysql` en `fxmanifest.lua` para mayor compatibilidad.
+
+### Nuevas Funciones
+- **Garajes Comunicados:** Modificada la consulta SQL en `server/main.lua` (`getVehiclesInParking`) para mostrar TODOS los vehículos almacenados (`stored = 1`) sin importar el garaje original donde se guardaron.
+- Ahora el jugador puede ver y extraer sus vehículos desde CUALQUIER garaje configurado.
+
+### Archivos clave
+- `client/main.lua` — función `safeTC()` + lógica de garajes comunicados
+- `client/admin.lua` — funciones `t()` y `tf()` seguras
+- `nui/css/app.css` — fix layout
+- `server/main.lua` — SQL sin restricción por parking
+
+### Upgrade
+1. Sustituye los archivos: `client/main.lua`, `client/admin.lua`, `nui/css/app.css`, `server/main.lua`, `fxmanifest.lua`
+2. No hace falta tocar la base de datos.
+3. `restart ari_garage`.
+
+### Compatibilidad
+- 100% compatible con eventos, callbacks y exports de 1.15.2-ari. No hay breaking changes.
+
+---
+
 ## v1.15.2-ari
 
 ### Resumen

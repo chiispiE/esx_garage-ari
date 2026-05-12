@@ -1,6 +1,6 @@
 --[[
     ari_garage — server/version_check.lua
-    Version: 1.15.2-ari
+    Version: 1.15.3-ari
 
     Compares the local resource version (from fxmanifest.lua) against the
     latest published release on GitHub and prints a colored message in the
@@ -99,6 +99,8 @@ local function fetch(url, cb)
 end
 
 local function check()
+    do return end -- GitHub API Rate Limit (HTTP 403) fix: Desactivamos la comprobación de versión forzosamente.
+
     local cfg = Config.VersionCheck
     if not cfg or not cfg.Enabled then return end
 

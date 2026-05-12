@@ -1,6 +1,6 @@
 --[[
     ari_garage — Client
-    Version: 1.15.2-ari
+    Version: 1.15.3-ari
 --]]
 
 local LastMarker, LastPart = nil, nil
@@ -11,6 +11,16 @@ local currentVehicles, currentImpoundedVehicles = {}, {}
 local lastOpenContext = nil -- { kind = 'garage'|'impound', key = string, ref = table }
 local OpenGarageMenu, OpenImpoundMenu -- forward declarations
 local next = next
+
+local function ImpoundMapBlipsEnabled()
+    local c = Config.ImpoundMenuOnly
+    return c and c.ShowMapBlips == true
+end
+
+local function ImpoundWorldAccessEnabled()
+    local c = Config.ImpoundMenuOnly
+    return c and c.ShowWorldMarkers == true
+end
 
 local function PlayUISound()
     if Config.UI.Sound.Enabled then
@@ -76,8 +86,13 @@ end
 
 local function MapVehicleForUI(entry, overrideState)
     local props = entry.vehicle or entry.props or {}
+    if entry.plate and (not props.plate or props.plate == '') then
+        props.plate = entry.plate
+    end
     local displayName = props.model and GetDisplayNameFromVehicleModel(props.model) or 'CARNOTFOUND'
-    local stateName = overrideState or (entry.stored == 2 and 'impounded' or (entry.stored == 1 and 'stored' or 'out'))
+    local stored = tonumber(entry.stored)
+    local stateName = overrideState
+        or (stored == 2 and 'impounded' or (stored == 1 and 'stored' or 'out'))
 
     return {
         model = displayName ~= 'CARNOTFOUND' and displayName or (props.modelName or 'Unknown'),
@@ -91,27 +106,32 @@ local function MapVehicleForUI(entry, overrideState)
     }
 end
 
+local function safeTC(key)
+    local str = TranslateCap(key)
+    return str or key or ''
+end
+
 local function BuildLocales()
     return {
-        action = TranslateCap('veh_exit'),
-        veh_model = TranslateCap('veh_model'),
-        veh_plate = TranslateCap('veh_plate'),
-        veh_condition = TranslateCap('veh_condition'),
-        veh_action = TranslateCap('veh_action'),
-        impound_action = TranslateCap('impound_action'),
-        locate_impound = TranslateCap('locate_impound'),
-        no_veh_parking = TranslateCap('no_veh_parking'),
-        no_veh_impounded = TranslateCap('no_veh_impounded'),
-        pay_impound = TranslateCap('pay_impound'),
-        fuel = TranslateCap('fuel') or 'Fuel',
-        state_label = TranslateCap('veh_state'),
-        state_garage = TranslateCap('state_garage'),
-        state_impound = TranslateCap('state_impound'),
-        state_out = TranslateCap('state_out'),
-        release_cost = TranslateCap('release_cost'),
-        free_release = TranslateCap('free_release'),
-        no_results = TranslateCap('no_results'),
-        out_action = TranslateCap('out_action'),
+        action = safeTC('veh_exit'),
+        veh_model = safeTC('veh_model'),
+        veh_plate = safeTC('veh_plate'),
+        veh_condition = safeTC('veh_condition'),
+        veh_action = safeTC('veh_action'),
+        impound_action = safeTC('impound_action'),
+        locate_impound = safeTC('locate_impound'),
+        no_veh_parking = safeTC('no_veh_parking'),
+        no_veh_impounded = safeTC('no_veh_impounded'),
+        pay_impound = safeTC('pay_impound'),
+        fuel = safeTC('fuel') or 'Fuel',
+        state_label = safeTC('veh_state'),
+        state_garage = safeTC('state_garage'),
+        state_impound = safeTC('state_impound'),
+        state_out = safeTC('state_out'),
+        release_cost = safeTC('release_cost'),
+        free_release = safeTC('free_release'),
+        no_results = safeTC('no_results'),
+        out_action = safeTC('out_action'),
     }
 end
 
@@ -220,6 +240,14 @@ RegisterNUICallback('refresh', function(_, cb)
 end)
 
 RegisterNUICallback('spawnVehicle', function(data, cb)
+    -- Capturar antes de closemenu: closemenu borra lastOpenContext; en algunos frames thisGarage puede quedar nil.
+    local garageSnapshot = thisGarage
+    local poundSnapshot = thisPound
+    local openCtx = lastOpenContext
+    if not garageSnapshot and openCtx and openCtx.kind == 'garage' and openCtx.ref then
+        garageSnapshot = openCtx.ref
+    end
+
     local spawnCoords = vector3(data.spawnPoint.x, data.spawnPoint.y, data.spawnPoint.z)
     TriggerEvent('ari_garage:closemenu')
 
@@ -228,14 +256,47 @@ RegisterNUICallback('spawnVehicle', function(data, cb)
         return cb('ok')
     end
 
-    if thisGarage then
+    if data.plate and data.vehicleProps then
+        data.vehicleProps.plate = data.vehicleProps.plate or data.plate
+    end
+
+    local payImpound = data.requireImpoundPay == true
+        or data.requireImpoundPay == 'true'
+        or data.requireImpoundPay == 1
+
+    if garageSnapshot and payImpound then
+        thisGarage = nil
+        local poundKey = data.impoundPound
+        if not poundKey or poundKey == '' then
+            poundKey = data.poundName
+        end
+
+        ESX.TriggerServerCallback('ari_garage:checkMoney', function(result)
+            if not result or result.allowed == false then
+                ESX.ShowNotification(TranslateCap('not_allowed'), 'error')
+                return
+            end
+
+            if result.hasMoney == false then
+                ESX.ShowNotification(TranslateCap('missing_money'))
+                return
+            end
+
+            TriggerServerEvent('ari_garage:payPound', result.amount, poundKey, data.vehicleProps)
+            TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
+        end, data.exitVehicleCost, poundKey, data.vehicleProps)
+
+        return cb('ok')
+    end
+
+    if garageSnapshot then
         thisGarage = nil
         TriggerServerEvent('ari_garage:updateOwnedVehicle', false, nil, nil, data, spawnCoords)
         ESX.ShowNotification(TranslateCap('veh_released'))
         return cb('ok')
     end
 
-    if thisPound then
+    if poundSnapshot then
         ESX.TriggerServerCallback('ari_garage:checkMoney', function(result)
             if not result or result.allowed == false then
                 ESX.ShowNotification(TranslateCap('not_allowed'), 'error')
@@ -290,16 +351,18 @@ CreateThread(function()
     end
 
     for _, impound in pairs(Config.Impounds) do
-        local defaultBlip = Config.ImpoundBlip
-        local blip = AddBlipForCoord(impound.GetOutPoint.x, impound.GetOutPoint.y, impound.GetOutPoint.z)
-        SetBlipSprite(blip, impound.Sprite or defaultBlip.Sprite)
-        SetBlipDisplay(blip, defaultBlip.Display)
-        SetBlipScale(blip, impound.Scale or defaultBlip.Scale)
-        SetBlipColour(blip, impound.Colour or defaultBlip.Colour)
-        SetBlipAsShortRange(blip, defaultBlip.ShortRange)
-        BeginTextCommandSetBlipName('STRING')
-        AddTextComponentSubstringPlayerName(impound.Label or TranslateCap('Impound_blip_name'))
-        EndTextCommandSetBlipName(blip)
+        if ImpoundMapBlipsEnabled() then
+            local defaultBlip = Config.ImpoundBlip
+            local blip = AddBlipForCoord(impound.GetOutPoint.x, impound.GetOutPoint.y, impound.GetOutPoint.z)
+            SetBlipSprite(blip, impound.Sprite or defaultBlip.Sprite)
+            SetBlipDisplay(blip, defaultBlip.Display)
+            SetBlipScale(blip, impound.Scale or defaultBlip.Scale)
+            SetBlipColour(blip, impound.Colour or defaultBlip.Colour)
+            SetBlipAsShortRange(blip, defaultBlip.ShortRange)
+            BeginTextCommandSetBlipName('STRING')
+            AddTextComponentSubstringPlayerName(impound.Label or TranslateCap('Impound_blip_name'))
+            EndTextCommandSetBlipName(blip)
+        end
     end
 end)
 
@@ -343,17 +406,19 @@ CreateThread(function()
             end
         end
 
-        for _, impound in pairs(Config.Impounds) do
-            local getOutPoint = impound.GetOutPoint
-            if #(coords - vector3(getOutPoint.x, getOutPoint.y, getOutPoint.z)) < Config.DrawDistance then
-                local marker = Config.Markers.GetOutPoint
-                DrawMarker(marker.Type, getOutPoint.x, getOutPoint.y, getOutPoint.z,
-                    0.0, 0.0, 0.0, 0, 0.0, 0.0,
-                    marker.Size.x, marker.Size.y, marker.Size.z,
-                    marker.Color.r, marker.Color.g, marker.Color.b,
-                    marker.Alpha, false, true, 2, marker.Bob, false, false, false)
-                sleep = 0
-                break
+        if ImpoundWorldAccessEnabled() then
+            for _, impound in pairs(Config.Impounds) do
+                local getOutPoint = impound.GetOutPoint
+                if #(coords - vector3(getOutPoint.x, getOutPoint.y, getOutPoint.z)) < Config.DrawDistance then
+                    local marker = Config.Markers.GetOutPoint
+                    DrawMarker(marker.Type, getOutPoint.x, getOutPoint.y, getOutPoint.z,
+                        0.0, 0.0, 0.0, 0, 0.0, 0.0,
+                        marker.Size.x, marker.Size.y, marker.Size.z,
+                        marker.Color.r, marker.Color.g, marker.Color.b,
+                        marker.Alpha, false, true, 2, marker.Bob, false, false, false)
+                    sleep = 0
+                    break
+                end
             end
         end
 
@@ -386,7 +451,7 @@ OpenGarageMenu = function(garageKey, garage)
             SendNUIMessage(BuildGaragePayload(garageKey, garage, currentVehicles, currentImpoundedVehicles))
             SetNuiFocus(true, true)
             ESX.HideUI()
-        end)
+        end, garageKey)
     end, garageKey)
 end
 
@@ -463,18 +528,20 @@ CreateThread(function()
                 end
             end
 
-            for impoundKey, impound in pairs(Config.Impounds) do
-                local getOutPoint = impound.GetOutPoint
-                if #(coords - vector3(getOutPoint.x, getOutPoint.y, getOutPoint.z)) < 2.0 then
-                    isInMarker = true
-                    currentMarker = impoundKey
-                    currentPart = 'GetOutPoint'
+            if ImpoundWorldAccessEnabled() then
+                for impoundKey, impound in pairs(Config.Impounds) do
+                    local getOutPoint = impound.GetOutPoint
+                    if #(coords - vector3(getOutPoint.x, getOutPoint.y, getOutPoint.z)) < 2.0 then
+                        isInMarker = true
+                        currentMarker = impoundKey
+                        currentPart = 'GetOutPoint'
 
-                    if IsControlJustReleased(0, 38) and not menuIsShowed then
-                        OpenImpoundMenu(impoundKey, impound)
+                        if IsControlJustReleased(0, 38) and not menuIsShowed then
+                            OpenImpoundMenu(impoundKey, impound)
+                        end
+
+                        break
                     end
-
-                    break
                 end
             end
 

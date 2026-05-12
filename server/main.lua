@@ -1,6 +1,6 @@
 --[[
     ari_garage — Server
-    Version: 1.15.2-ari
+    Version: 1.15.3-ari
 --]]
 
 local VEHICLE_STATE = {
@@ -11,7 +11,7 @@ local VEHICLE_STATE = {
 
 CreateThread(function()
     local resourceName = GetCurrentResourceName()
-    local version = GetResourceMetadata(resourceName, 'version', 0) or '1.15.2-ari'
+    local version = GetResourceMetadata(resourceName, 'version', 0) or '1.15.3-ari'
     local author = GetResourceMetadata(resourceName, 'author', 0) or 'Ari'
 
     Wait(500)
@@ -77,40 +77,33 @@ end
 
 -- ── Single source of truth for impound release pricing ────────────────────
 local function calculateReleaseCost(impound, props)
-    if not impound then return 0 end
+    if not impound then
+        return 0
+    end
+
     local baseCost = impound.Cost or 0
+    local amount
 
     if not props or (Config.ImpoundDamageMult or 1.0) <= 1.0 then
-        return baseCost
+        amount = baseCost
+    else
+        local engineHealth = math.min(props.engineHealth or 1000, 1000)
+        local damageRatio = math.max(0.0, 1.0 - (engineHealth / 1000))
+        local mult = 1.0 + (damageRatio * (Config.ImpoundDamageMult - 1.0))
+        amount = math.floor(baseCost * mult)
     end
 
-    local engineHealth = math.min(props.engineHealth or 1000, 1000)
-    local damageRatio = math.max(0.0, 1.0 - (engineHealth / 1000))
-    local mult = 1.0 + (damageRatio * (Config.ImpoundDamageMult - 1.0))
-
-    return math.floor(baseCost * mult)
-end
-
-local function decodeVehicleRows(rows, impound)
-    local vehicles = {}
-
-    for i = 1, #rows do
-        local props = rows[i].vehicle and json.decode(rows[i].vehicle) or nil
-        if props then
-            local releaseCost = impound and calculateReleaseCost(impound, props) or 0
-
-            vehicles[#vehicles + 1] = {
-                vehicle = props,
-                plate = rows[i].plate,
-                releaseCost = releaseCost,
-                pound = rows[i].pound,
-                parking = rows[i].parking,
-                stored = rows[i].stored,
-            }
-        end
+    local cfg = Config.ImpoundMenuOnly
+    if cfg and cfg.ReleaseFeeOverride ~= nil then
+        return math.max(0, math.floor(tonumber(cfg.ReleaseFeeOverride) or 0))
     end
 
-    return vehicles
+    local feeMul = cfg and tonumber(cfg.ReleaseFeeMultiplier) or 1.0
+    if not feeMul or feeMul ~= feeMul then
+        feeMul = 1.0
+    end
+
+    return math.max(0, math.floor(amount * feeMul))
 end
 
 local function computeReleaseData(xPlayer, impound, props)
@@ -132,6 +125,50 @@ local function computeReleaseData(xPlayer, impound, props)
         isFree = finalCost <= 0,
         reason = nil,
     }
+end
+
+local function decodeVehicleRows(rows, impoundFallback, xPlayer)
+    rows = rows or {}
+    local vehicles = {}
+
+    for i = 1, #rows do
+        local props = rows[i].vehicle and json.decode(rows[i].vehicle) or nil
+        if props then
+            local stored = tonumber(rows[i].stored) or 0
+            local impCfg = nil
+
+            if stored == 2 then
+                if rows[i].pound and Config.Impounds[rows[i].pound] then
+                    impCfg = Config.Impounds[rows[i].pound]
+                else
+                    impCfg = impoundFallback
+                end
+            end
+
+            local releaseCost, releaseFree = 0, false
+            if impCfg and xPlayer then
+                local rd = computeReleaseData(xPlayer, impCfg, props)
+                if rd.allowed then
+                    releaseCost = rd.amount
+                    releaseFree = rd.isFree == true
+                end
+            elseif impCfg then
+                releaseCost = calculateReleaseCost(impCfg, props)
+            end
+
+            vehicles[#vehicles + 1] = {
+                vehicle = props,
+                plate = rows[i].plate,
+                releaseCost = releaseCost,
+                releaseFree = releaseFree,
+                pound = rows[i].pound,
+                parking = rows[i].parking,
+                stored = rows[i].stored,
+            }
+        end
+    end
+
+    return vehicles
 end
 
 local function canAffordImpound(xPlayer, amount)
@@ -212,6 +249,43 @@ local function getOwnedVehicleByPlate(identifier, plate)
     )
 end
 
+--- Resuelve fila en owned_vehicles aunque `props.plate` no coincida exactamente con la columna `plate`.
+local function getOwnedVehicleForPlayer(identifier, data)
+    if not data or not data.vehicleProps then
+        return nil
+    end
+
+    local propsPlate = data.vehicleProps.plate
+    local rowPlate = data.plate
+    if propsPlate and propsPlate ~= '' then
+        local row = getOwnedVehicleByPlate(identifier, propsPlate)
+        if row then
+            return row
+        end
+    end
+    if rowPlate and rowPlate ~= '' and rowPlate ~= propsPlate then
+        local row = getOwnedVehicleByPlate(identifier, rowPlate)
+        if row then
+            return row
+        end
+    end
+
+    local cand = propsPlate or rowPlate
+    if not cand or cand == '' then
+        return nil
+    end
+
+    return MySQL.single.await(
+        [[
+            SELECT `plate`, `vehicle`, `stored`, `parking`, `pound`
+            FROM `owned_vehicles`
+            WHERE `owner` = ? AND UPPER(REPLACE(REPLACE(`plate`, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))
+            LIMIT 1
+        ]],
+        { identifier, cand }
+    )
+end
+
 local function getOwnedVehicleByPlateAnyOwner(plate)
     return MySQL.single.await(
         'SELECT `owner`, `plate`, `vehicle`, `stored`, `parking`, `pound` FROM owned_vehicles WHERE `plate` = ? LIMIT 1',
@@ -236,18 +310,27 @@ RegisterServerEvent('ari_garage:updateOwnedVehicle')
 AddEventHandler('ari_garage:updateOwnedVehicle', function(stored, parking, impound, data, spawn)
     local source = source
     local xPlayer, identifier = getPlayerFromSource(source)
-    if not xPlayer or not data or not data.vehicleProps or not data.vehicleProps.plate then
+    if not xPlayer or not data or not data.vehicleProps then
         return
     end
 
-    local ownedVehicle = getOwnedVehicleByPlate(identifier, data.vehicleProps.plate)
+    local ownedVehicle = getOwnedVehicleForPlayer(identifier, data)
     if not ownedVehicle then
         xPlayer.showNotification(TranslateCap('not_owning_veh'))
         return
     end
 
+    -- Matrícula canónica de BD (el JSON a veces trae plate distinto o vacío)
+    data.vehicleProps.plate = ownedVehicle.plate
+    if not data.vehicleProps.model then
+        local decoded = ownedVehicle.vehicle and json.decode(ownedVehicle.vehicle) or nil
+        if decoded and decoded.model then
+            data.vehicleProps.model = decoded.model
+        end
+    end
+
     local state = stored and VEHICLE_STATE.STORED or VEHICLE_STATE.OUT
-    local updated = updateVehicleState(identifier, data.vehicleProps.plate, state, parking, impound, data.vehicleProps)
+    local updated = updateVehicleState(identifier, ownedVehicle.plate, state, parking, impound, data.vehicleProps)
     if updated < 1 then
         return
     end
@@ -317,20 +400,22 @@ ESX.RegisterServerCallback('ari_garage:getVehiclesInParking', function(source, c
         return cb({})
     end
 
+    -- Todos los garajes comunicados: muestra TODOS los vehículos almacenados (stored = 1)
+    -- Sin importar en qué parking fueron guardados originalmente.
     local result = MySQL.query.await(
         [[
             SELECT `plate`, `vehicle`, `stored`, `parking`, `pound`
             FROM owned_vehicles
-            WHERE `owner` = ? AND `stored` = ? AND `parking` = ?
+            WHERE `owner` = ? AND `stored` = ?
             ORDER BY `plate` ASC
         ]],
-        { identifier, VEHICLE_STATE.STORED, parking }
+        { identifier, VEHICLE_STATE.STORED }
     )
 
-    cb(decodeVehicleRows(result))
+    cb(decodeVehicleRows(result, nil, nil))
 end)
 
-ESX.RegisterServerCallback('ari_garage:getVehiclesImpounded', function(source, cb)
+ESX.RegisterServerCallback('ari_garage:getVehiclesImpounded', function(source, cb, garageKey)
     local xPlayer, identifier = getPlayerFromSource(source)
     if not xPlayer then
         return cb({})
@@ -346,7 +431,13 @@ ESX.RegisterServerCallback('ari_garage:getVehiclesImpounded', function(source, c
         { identifier, VEHICLE_STATE.OUT, VEHICLE_STATE.IMPOUNDED }
     )
 
-    cb(decodeVehicleRows(result))
+    local fallbackImpound = nil
+    if garageKey and Config.Garages[garageKey] and Config.Garages[garageKey].ImpoundedName then
+        local iname = Config.Garages[garageKey].ImpoundedName
+        fallbackImpound = Config.Impounds[iname]
+    end
+
+    cb(decodeVehicleRows(result, fallbackImpound, xPlayer))
 end)
 
 ESX.RegisterServerCallback('ari_garage:getVehiclesInPound', function(source, cb, impoundName)
@@ -378,7 +469,7 @@ ESX.RegisterServerCallback('ari_garage:getVehiclesInPound', function(source, cb,
         { identifier, VEHICLE_STATE.IMPOUNDED, impoundName }
     )
 
-    local vehicles = decodeVehicleRows(result, impound)
+    local vehicles = decodeVehicleRows(result, impound, xPlayer)
     local applyFreeRelease = impound.FreeRelease == true and isJobAllowedForImpound(xPlayer, impound)
     if applyFreeRelease then
         for i = 1, #vehicles do

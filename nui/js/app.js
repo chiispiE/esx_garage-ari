@@ -85,8 +85,17 @@
   function getActionLabel(type, vehicle) {
     const loc = state.locales;
     if (type === 'impounded') {
+      // DB `stored` = 0: fuera del garaje (mundo / despawn). Siguen apareciendo en esta pestaña;
+      // deben poder recuperarse igual que desde la lista del garaje.
       if (vehicle.state === 'out') {
+        if (state.menuType === 'garage') {
+          return loc.action || loc.veh_exit || 'Retrieve';
+        }
         return loc.out_action || 'Outside';
+      }
+
+      if (state.menuType === 'garage') {
+        return loc.pay_impound || 'Pay & Release';
       }
 
       return state.menuType === 'impound'
@@ -119,6 +128,20 @@
 
     if (type === 'impounded') {
       if (vehicle.state === 'out') {
+        if (state.menuType === 'garage') {
+          return `
+      <button class="btn-action btn-primary vcard-spawn-btn"
+        data-props='${escapeAttr(vehicle.props)}'
+        data-plate="${(vehicle.plate || '').replace(/"/g, '&quot;')}"
+        data-release-cost="0"
+        data-require-impound-pay="0"
+        data-impound-pound="">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="5 12 19 12"></polyline><polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+        ${label}
+      </button>`;
+        }
         return `
           <button class="btn-action btn-disabled" disabled>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
@@ -126,6 +149,23 @@
             </svg>
             ${label}
           </button>`;
+      }
+
+      if (vehicle.state === 'impounded' && state.menuType === 'garage') {
+        const needPay = !vehicle.releaseFree;
+        const fee = Number(vehicle.releaseCost || 0);
+        return `
+        <button class="btn-action btn-primary vcard-spawn-btn"
+          data-props='${escapeAttr(vehicle.props)}'
+          data-plate="${(vehicle.plate || '').replace(/"/g, '&quot;')}"
+          data-release-cost="${needPay ? fee : 0}"
+          data-require-impound-pay="${needPay ? '1' : '0'}"
+          data-impound-pound="${(vehicle.pound || '').replace(/"/g, '&quot;')}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="5 12 19 12"></polyline><polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+          ${label}
+        </button>`;
       }
 
       return `
@@ -143,7 +183,10 @@
     return `
       <button class="btn-action btn-primary vcard-spawn-btn"
         data-props='${escapeAttr(vehicle.props)}'
-        data-release-cost="${vehicle.releaseCost || 0}">
+        data-plate="${(vehicle.plate || '').replace(/"/g, '&quot;')}"
+        data-release-cost="${vehicle.releaseCost || 0}"
+        data-require-impound-pay="0"
+        data-impound-pound="">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="5 12 19 12"></polyline><polyline points="12 5 19 12 12 19"></polyline>
         </svg>
@@ -369,9 +412,12 @@
     if (spawnButton) {
       post('spawnVehicle', {
         vehicleProps: JSON.parse(spawnButton.dataset.props),
+        plate: spawnButton.dataset.plate || '',
         spawnPoint: state.spawnPoint,
         exitVehicleCost: Number(spawnButton.dataset.releaseCost || state.defaultPoundCost || 0),
         poundName: state.poundName,
+        requireImpoundPay: spawnButton.dataset.requireImpoundPay === '1',
+        impoundPound: spawnButton.dataset.impoundPound || '',
       });
       hideVisual();
       return;

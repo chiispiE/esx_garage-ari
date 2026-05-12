@@ -1,6 +1,6 @@
 --[[
     ari_garage — Config
-    Version: 1.15.2-ari
+    Version: 1.15.3-ari
     ─────────────────────────────────────────────────────────────
     All settings are documented inline.
     Do NOT edit anything outside of this file for base behaviour.
@@ -36,6 +36,16 @@ Config.NotifyOnImpound = true
 
 -- Fine multiplier based on vehicle condition (1.0 = no change, 1.5 = 50% extra if damaged)
 Config.ImpoundDamageMult = 1.0
+
+-- Depósito solo por menú del garaje (sin blips / sin punto [E] en el mundo)
+Config.ImpoundMenuOnly = {
+    ShowMapBlips = false,
+    ShowWorldMarkers = false,
+    --- Precio fijo al sacar embargado (stored = 2) desde el menú. nil = usar Cost del depósito del vehículo.
+    ReleaseFeeOverride = nil,
+    --- Si no hay override: Cost × este multiplicador (luego aplica ImpoundDamageMult).
+    ReleaseFeeMultiplier = 1.0,
+}
 
 -- ─── BILLING ───────────────────────────────────────────────────────────────────
 
@@ -216,6 +226,19 @@ Config.Impounds = {
         Sprite  = 524,
         Scale   = 0.8,
         Colour  = 1,
+    },
+}
+
+-- ─── ADMIN (ox_lib) ────────────────────────────────────────────────────────────
+-- Menú para borrar filas de `owned_vehicles` (comando + callbacks servidor).
+-- Los grupos deben coincidir con `Config.AdminGroups` de es_extended (o amplíalos aquí).
+Config.AdminGarage = {
+    Command = 'admingarage',
+    -- Si true, registra un KeyMapping vacío (puedes asignar tecla en Ajustes → FiveM).
+    KeyRegister = false,
+    Groups = {
+        ['owner'] = true,
+        ['admin'] = true,
     },
 }
 
