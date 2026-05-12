@@ -13,11 +13,11 @@
 
 **Advanced Vehicle Garage & Impound System for ESX**
 
-`v1.15.2-ari` · FiveM · ESX · oxmysql
+`v1.15.3-ari` · FiveM · ESX · oxmysql
 
 [![FiveM](https://img.shields.io/badge/FiveM-ESX-orange?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNHYtNGgtNGw2LTZoMHY0aDRsLTYgNnoiLz48L3N2Zz4=)](https://fivem.net)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.15.2--ari-brightgreen?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.15.3--ari-brightgreen?style=flat-square)]()
 
 <br/>
 
@@ -25,6 +25,19 @@
 
 
 </div>
+
+---
+
+## ✨ What's New in 1.15.3-ari
+
+> Bug fixes & connected garages.
+
+| Area | Change |
+|------|--------|
+| 🐛 **Fix** | Fixed `TranslateCap` error in admin menu (`/admingarage`) that caused crashes when searching vehicles by plate. Added safe `safeTC()` and `tf()` wrapper functions. |
+| 🐛 **Fix** | Fixed UI layout — added `height: 100%` to content area for proper scrolling with many vehicles. |
+| 🔧 **SQL** | Updated dependency from `@mysql-async` to `@oxmysql` for better compatibility. |
+| ✨ **Feature** | **Connected Garages** — All garages now show ALL stored vehicles. Players can access their vehicles from ANY configured garage, regardless of where they were originally stored. |
 
 ---
 
@@ -247,7 +260,7 @@ Set `Config.UseTarget = true` to disable markers and use your preferred target r
 ## 🤝 Credits
 
 - Original `esx_garage_v2` by the ESX-Framework team
-- Redesign & v1.15.2-ari by **Ari**
+- Redesign & v1.15.x-ari by **Ari**
 
 ---
 
